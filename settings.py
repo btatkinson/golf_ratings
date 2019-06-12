@@ -2,7 +2,7 @@
 
 ielo_set = {
     'init':1500,
-    # right now, ielo beta doesn't change anything
+    'K':1.5,
     'beta':400,
     'ACP':0,
     'C':3.3
@@ -11,11 +11,11 @@ ielo_set = {
 
 glicko_set = {
     'init':1500,
-    'phi':168,
+    'phi':350,
     'sigma':0.06,
-    'tau':.03,
+    'tau':0.1,
     'epsilon':0.000001,
-    'resolve_time':3
+    'ratio':173.7178
 }
 
 

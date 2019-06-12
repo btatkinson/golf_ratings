@@ -1,7 +1,18 @@
 import numpy as np
 import pandas as pd
 import math
+import sys
 
+sys.path.insert(0, '../')
+from settings import *
+
+MU = glicko_set['init']
+PHI = glicko_set['phi']
+SIGMA = glicko_set['sigma']
+TAU = glicko_set['tau']
+EPSILON = glicko_set['epsilon']
+Q = math.log(10)/400
+ratio = glicko_set['ratio']
 
 class Glicko(object):
     """docstring for Glicko."""
@@ -58,19 +69,19 @@ class Glicko(object):
     def reduce_impact(self, RD):
         return 1 / math.sqrt(1 + (3 * RD ** 2) / (math.pi ** 2))
 
-    def update(self, team, opps):
+    def update(self, player, opps):
 
-        mu = (team.glicko - MU)/ratio
-        phi = team.g_phi/ratio
-        sigma = team.g_sigma
+        mu = (player.glicko - MU)/ratio
+        phi = player.gvar/ratio
+        sigma = player.gsig
 
         dsq_inv = 0
         var_inv = 0
         diff = 0
         for opp, result in opps:
             opp_mu = (opp.glicko - MU)/ratio
-            opp_phi = opp.g_phi/ratio
-            opp_sigma = opp.g_sigma
+            opp_phi = opp.gvar/ratio
+            opp_sigma = opp.gsig
 
             impact = self.reduce_impact(opp_phi)
             expected_result = self.get_expected(mu, opp_mu, impact)
@@ -89,11 +100,11 @@ class Glicko(object):
         phi = 1 / math.sqrt(1 / phi_star ** 2 + 1 / var)
         mu = mu + phi ** 2 * (diff / var)
 
-        team.glicko = mu * ratio + MU
-        team.g_phi = phi * ratio
-        team.g_sigma = sigma
+        player.glicko = mu * ratio + MU
+        player.gvar = phi * ratio
+        player.gsig = sigma
 
-        return team
+        return player
 
 
 # end

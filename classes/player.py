@@ -9,28 +9,37 @@ class Player(object):
 
     def __init__(self,
         name=None,
-        ielo=ielo_set['init'],
-        rnds_played=0,
+        elo=ielo_set['init'],
+        rnds_played = 0,
         glicko = glicko_set['init'],
         gvar = glicko_set['phi'],
         gsig = glicko_set['sigma'],
         ldate = None,
         cdate = None,
         lloc = None,
-        cloc = None
+        cloc = None,
+        R1=None,
+        R2=None,
+        R3=None,
+        R4=None
         ):
 
         super(Player, self).__init__()
         self.name = name
-        self.ielo = ielo
+        self.elo = elo
+        self.rnds_played = rnds_played
         self.glicko = glicko
         self.gvar = gvar
         self.gsig = gsig
         self.ldate = ldate
         self.cdate = cdate
+        self.days_since = self.days_since_last()
         self.lloc = lloc
         self.cloc = cloc
-        self.days_since = self.days_since_last()
+        self.R1 = R1
+        self.R2 = R2
+        self.R3 = R3
+        self.R4 = R4
 
     def days_since_last(self):
         dsl = 365

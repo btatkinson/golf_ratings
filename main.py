@@ -8,20 +8,30 @@ import re
 from settings import *
 from helpers import *
 from itertools import combinations
+from tqdm import tqdm
 
 sys.path.insert(0, './classes')
 from player import Player
 from glicko import Glicko
 from elo import Elo
 
+def get_tournament_leaderboard(row):
+    name = row['name']
+    name = name.strip()
+    name = name.replace(" ","")
+    tour = row['tour']
+    season = row['season']
+    season = str(season)
+    tournament_leaderboard_path = '../golf_scraper/leaderboards/'+season+'/'+tour+'/'+name+'.csv'
+    return pd.read_csv(tournament_leaderboard_path)
+
 player_database = pd.DataFrame(columns=['name','ielo','num_played','glicko','gvar','last_date','last_loc'])
 
 # load player_database
 player_database_path = './data/players.csv'
 pdf = pd.read_csv(player_database_path)
-pdf = pdf.set_index('name')
-
 # change to dictionary format bc it's quicker
+pdf = pdf.set_index('name')
 pdf = pdf.to_dict('index')
 
 # load schedule
@@ -36,30 +46,39 @@ collected_ids = list(cdf.TID.unique())
 # only need tournaments that have been scraped
 sdf = sdf.loc[sdf['tid'].isin(collected_ids)]
 
+# sort by oldest first
+sdf['end_date'] = pd.to_datetime(sdf['end_date'], format='%b %d %Y')
+sdf = sdf.sort_values(by='end_date', ascending=True)
+
 del cdf
 gc.collect()
 
 # iterate tournaments
-sdf = sdf[2:3]
+sdf = sdf[:25]
 print(sdf.head())
 
-for index, row in sdf.iterrows():
+# initialize ratings objects
+Glicko = Glicko()
+Elo = Elo()
 
-#   load tournament leaderboard based on inferred path
-    name = row['name']
-    name = name.strip()
-    name = name.replace(" ","")
-    tour = row['tour']
-    season = row['season']
-    start_date = row['start_date']
-    tournament_leaderboard_path = '../golf_scraper/leaderboards/'+season+'/'+tour+'/'+name+'.csv'
-    tdf = pd.read_csv(tournament_leaderboard_path)
+for index, row in tqdm(sdf.iterrows()):
+
+    # load tournament leaderboard based on inferred path
+    tlb = get_tournament_leaderboard(row)
 
     # list to contain player objects
     plist = []
-    for i, r in tdf.iterrows():
+
+    # possible options to speed up here
+    # could try subtracting sets, then multiple key lookup using pydash or itemgetter
+
+    for i, r in tlb.iterrows():
         player = r['name']
+
+        # name preprocessing
+        player = name_pp(player)
         # if in dict, initialize player class with data
+        start_date = r['start_date']
         if player in pdf:
             dict = pdf[player]
             PObj = Player(
@@ -92,27 +111,8 @@ for index, row in sdf.iterrows():
         plist.append(PObj)
 
     # separate round cols using regex
-    col_text = ' '.join(list(tdf))
+    col_text = ' '.join(list(tlb))
     rounds = re.findall(r"(\bR[1-4]{1}\b)", col_text)
-
-    Glicko = Glicko()
-    Elo = Elo()
-
-    #############
-    ##  TEST   ##
-    #############
-    # p1 = Player(name='Blake',glicko=1500, gvar=200, gsig=0.06)
-    # p2 = Player(name='Kelly',glicko=1400, gvar=30)
-    # p3 = Player(name='Eric',glicko=1550, gvar=100)
-    # p4 = Player(name='Cailynn',glicko=1700, gvar=300)
-    #
-    # results = [[p2, 1],[p3, 0], [p4,0]]
-    #
-    # p1 = Glicko.update(p1, results)
-    # print(p1.glicko, p1.gvar, p1.gsig)
-    #################
-    ##  END TEST   ##
-    #################
 
     # find unique player combinations for elo calc
     for round in rounds:
@@ -174,6 +174,7 @@ for index, row in sdf.iterrows():
 
             results = []
             player_round_score = getattr(pobj, round)
+            # append result vs opponent
             for opponent, opp_score in opps:
                 if opp_score == player_round_score:
                     result = 0.5
@@ -195,26 +196,16 @@ for index, row in sdf.iterrows():
         # recombine good_plist and bad_plist
         plist = good_plist + bad_plist
 
+    # update dict
+    for p in plist:
+        # get stats into dict format
+        stats = {'ielo': p.elo, 'rnds_played': p.rnds_played, 'glicko': p.glicko, 'gvar': p.gvar, 'gsig':p.gsig, 'last_date': p.ldate, 'last_loc': p.lloc}
+        pdf[p.name] = stats
 
-for p in plist:
-    print(p.name, p.elo, p.glicko)
-
-
-
-#
-# for np in new_pobjs:
-#     print(np.name, np.glicko)
-
-
-    #       glicko calculation
-    #       ielo calc
-    #       update ratings
-
-#   update ratings post tournament
-
-# update ratings post all tournaments
-
-# save player player_database
+player_ratings = pd.DataFrame.from_dict(pdf, orient='index')
+player_ratings.reset_index()
+player_ratings = player_ratings.sort_values(by='ielo',ascending=False)
+print(player_ratings)
 
 
 

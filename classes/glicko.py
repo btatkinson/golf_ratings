@@ -5,6 +5,7 @@ import sys
 
 sys.path.insert(0, '../')
 from settings import *
+from helpers import *
 
 MU = glicko_set['init']
 PHI = glicko_set['phi']
@@ -78,6 +79,8 @@ class Glicko(object):
         dsq_inv = 0
         var_inv = 0
         diff = 0
+        # tracking error
+        all_errors = []
         for opp, result in opps:
             opp_mu = (opp.glicko - MU)/ratio
             opp_phi = opp.gvar/ratio
@@ -85,6 +88,8 @@ class Glicko(object):
 
             impact = self.reduce_impact(opp_phi)
             expected_result = self.get_expected(mu, opp_mu, impact)
+            match_error = cross_entropy(expected_result, result)
+            all_errors.append(match_error)
             var_inv += impact ** 2 * expected_result * (1 - expected_result)
             diff += impact * (result - expected_result)
             dsq_inv += (expected_result * (1 - expected_result) * (Q ** 2) * (impact ** 2))
@@ -104,7 +109,9 @@ class Glicko(object):
         player.gvar = phi * ratio
         player.gsig = sigma
 
-        return player
+        error = sum(all_errors)/len(all_errors)
+
+        return player, error
 
 
 # end

@@ -9,6 +9,7 @@ class Player(object):
 
     def __init__(self,
         name=None,
+        tour='PGA',
         elo=ielo_set['init'],
         rnds_played = 0,
         glicko = glicko_set['init'],
@@ -21,34 +22,75 @@ class Player(object):
         R1=None,
         R2=None,
         R3=None,
-        R4=None
+        R4=None,
+        wins=int(0),
+        losses=int(0),
+        ties=int(0),
+        matches=0,
+        wl=float(0.5)
         ):
 
         super(Player, self).__init__()
         self.name = name
-        self.elo = elo
+        if tour == 'PGA':
+            self.elo = elo
+            self.glicko = glicko
+        else:
+            self.elo = euro_init['elo']
+            self.glicko = euro_init['glicko']
         self.rnds_played = rnds_played
-        self.glicko = glicko
         self.gvar = gvar
         self.gsig = gsig
         self.ldate = ldate
         self.cdate = cdate
-        self.days_since = self.days_since_last()
         self.lloc = lloc
         self.cloc = cloc
         self.R1 = R1
         self.R2 = R2
         self.R3 = R3
         self.R4 = R4
+        self.wins=wins
+        self.losses=losses
+        self.ties=ties
+        self.matches=matches
+        self.wl=wl
+        self.days_since = self.days_since_last()
+
+    def add_win(self):
+        self.wins+=1
+        self.matches+=1
+        return
+
+    def add_loss(self):
+        self.losses+=1
+        self.matches+=1
+        return
+
+    def add_tie(self):
+        self.ties+=1
+        self.matches+=1
+        return
+
+    def calc_win_loss(self):
+        if self.rnds_played <= 1:
+            self.wl = 0.5
+        else:
+            self.wl = (self.wins + 0.5*self.ties)/self.matches
+        return
 
     def days_since_last(self):
         dsl = 365
         if self.ldate is None:
-            pass
+            return None
         elif self.cdate is None:
-            pass
+            return None
         else:
-            last_date = datetime.datetime.strptime(self.ldate, '%b %d %Y').date()
-            current_date = datetime.datetime.strptime(self.cdate, '%b %d %Y').date()
-            dsl = current_date - last_date
-        return dsl
+            try:
+                last_date = datetime.datetime.strptime(str(self.ldate), '%b %d %Y').date()
+                current_date = datetime.datetime.strptime(str(self.cdate), '%b %d %Y').date()
+                dsl = current_date - last_date
+                days = dsl.days
+            except:
+                print("FIX THIS OMEGA EURO MASTERS 2016")
+                days = 0
+        return days

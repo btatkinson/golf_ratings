@@ -7,7 +7,9 @@ import re
 
 from settings import *
 from helpers import *
+from operator import itemgetter
 from itertools import combinations
+from sklearn.metrics import log_loss
 from tqdm import tqdm
 
 sys.path.insert(0, './classes')
@@ -54,23 +56,63 @@ del cdf
 gc.collect()
 
 # iterate tournaments
-sdf = sdf[:25]
+START = 0
+END = 2000
+sdf = sdf[START:END]
 print(sdf.head())
 
 # initialize ratings objects
 Glicko = Glicko()
 Elo = Elo()
 
+all_elo_loss = []
+all_glicko_loss = []
+all_log5_loss = []
+
+all_r1e_errors = []
+all_r2e_errors = []
+all_r3e_errors = []
+all_r4e_errors = []
+
+all_r1g_errors = []
+all_r2g_errors = []
+all_r3g_errors = []
+all_r4g_errors = []
+
+
+# all_num_opps = []
+
 for index, row in tqdm(sdf.iterrows()):
+
+    not_valid = validate_tournament(row)
+    if not_valid:
+        continue
 
     # load tournament leaderboard based on inferred path
     tlb = get_tournament_leaderboard(row)
+    start_date = tlb['start_date'].mode()[0]
+
+    if row['name'] == 'ANZChampionship':
+        print("FIX THIS")
+        continue
+    if row['name'] == 'Reno-TahoeOpen':
+        print("FIX THIS 2012")
+        continue
+    if row['name'] == 'BarracudaChampionship':
+        print("FIX THIS 2014")
+        continue
 
     # list to contain player objects
     plist = []
 
+    # error tracking
+    telo_err = []
+    tglicko_err = []
+    tl5_err = []
+
     # possible options to speed up here
     # could try subtracting sets, then multiple key lookup using pydash or itemgetter
+    # note: tried itemgetter and pydash and neither were faster (bc they returned errors on missing)
 
     for i, r in tlb.iterrows():
         player = r['name']
@@ -78,7 +120,6 @@ for index, row in tqdm(sdf.iterrows()):
         # name preprocessing
         player = name_pp(player)
         # if in dict, initialize player class with data
-        start_date = r['start_date']
         if player in pdf:
             dict = pdf[player]
             PObj = Player(
@@ -95,12 +136,18 @@ for index, row in tqdm(sdf.iterrows()):
                 R1 = r['R1'],
                 R2 = r['R2'],
                 R3 = r['R3'],
-                R4 = r['R4']
+                R4 = r['R4'],
+                wins=dict['wins'],
+                losses=dict['losses'],
+                ties=dict['ties'],
+                wl=dict['wl']
             )
         # if not in dict, initialize player class with new player settings
         else:
             PObj = Player(
                 name=player,
+                tour=r['tour'],
+                ldate=start_date,
                 cdate=start_date,
                 R1 = r['R1'],
                 R2 = r['R2'],
@@ -128,13 +175,22 @@ for index, row in tqdm(sdf.iterrows()):
             else:
                 bad_plist.append(p)
 
+        # add uncertainty if it's been awhile since they've played
+        # if round == 'R1':
+        #     for p in good_plist:
+        #         if p.days_since is not None:
+        #             if p.days_since >= 15:
+        #                 p.gvar = add_uncertainty(p.gvar, p.days_since)
+
         # all combinations of players not cut or withdrawn
         combos = [c for c in combinations(good_plist,2)]
 
         # track number of opponents for Elo K val
         num_opps = len(good_plist) - 1
 
-        ## elo calc ##
+        # all_num_opps.append(num_opps)
+
+        ## elo / log5 calc ##
 
         # track elo changes for everyone
         change_dict = {}
@@ -149,14 +205,47 @@ for index, row in tqdm(sdf.iterrows()):
             margin = abs(p2_score - p1_score)
             if p1_score <= p2_score:
                 # player 1 is winner/draw
+                # log5_x = l5_x(p1.wl,p2.wl)
+                log5_x = p1.wl
+                if p1_score == p2_score:
+                    p1.add_tie()
+                    p2.add_tie()
+                else:
+                    p1.add_win()
+                    p2.add_loss()
                 expected_result = Elo.x(p1.elo, p2.elo)
                 p1_change, p2_change = Elo.get_ielo_delta(expected_result, margin, p1, p2, num_opps)
+                # used for error tracking
+                x = expected_result
+                if p1_score == p2_score:
+                    result = 0.5
+                else:
+                    result = 1
             else:
                 # player 2 is winner
+                # log5_x = l5_x(p1.wl,p2.wl)
+                log5_x = p1.wl
+                p2.add_win()
+                p1.add_loss()
                 # order of arguments matters
                 expected_result = Elo.x(p2.elo, p1.elo)
                 p2_change, p1_change = Elo.get_ielo_delta(expected_result, margin, p2, p1, num_opps)
+                # used for error tracking
+                x = 1-expected_result
+                result = 0
 
+            elo_error = cross_entropy(x, result)
+            l5_error = cross_entropy(log5_x, result)
+            telo_err.append(elo_error)
+            if round == 'R1':
+                all_r1e_errors.append(elo_error)
+            if round == 'R2':
+                all_r2e_errors.append(elo_error)
+            if round == 'R3':
+                all_r3e_errors.append(elo_error)
+            if round == 'R4':
+                all_r4e_errors.append(elo_error)
+            tl5_err.append(l5_error)
             change_dict[p1.name] += p1_change
             change_dict[p2.name] += p2_change
 
@@ -184,7 +273,16 @@ for index, row in tqdm(sdf.iterrows()):
                     result = 1
                 results.append([opponent, result])
             # Glicko class edits glicko rating of
-            new_pobj = Glicko.update(pobj, results)
+            new_pobj, glicko_error = Glicko.update(pobj, results)
+            if round == 'R1':
+                all_r1g_errors.append(glicko_error)
+            if round == 'R2':
+                all_r2g_errors.append(glicko_error)
+            if round == 'R3':
+                all_r3g_errors.append(glicko_error)
+            if round == 'R4':
+                all_r4g_errors.append(glicko_error)
+            tglicko_err.append(glicko_error)
             new_pobjs.append(new_pobj)
         # reset all the player objects with the new ratings
         good_plist = new_pobjs
@@ -192,6 +290,7 @@ for index, row in tqdm(sdf.iterrows()):
         # add rounds played
         for gp in good_plist:
             gp.rnds_played += 1
+            gp.calc_win_loss()
 
         # recombine good_plist and bad_plist
         plist = good_plist + bad_plist
@@ -199,13 +298,44 @@ for index, row in tqdm(sdf.iterrows()):
     # update dict
     for p in plist:
         # get stats into dict format
-        stats = {'ielo': p.elo, 'rnds_played': p.rnds_played, 'glicko': p.glicko, 'gvar': p.gvar, 'gsig':p.gsig, 'last_date': p.ldate, 'last_loc': p.lloc}
+        stats = {'ielo': p.elo, 'rnds_played': p.rnds_played, 'glicko': p.glicko, 'gvar': p.gvar, 'gsig':p.gsig, 'last_date': start_date, 'last_loc': p.lloc,
+        'wins':p.wins,'losses':p.losses,'ties':p.ties,'wl':p.wl}
         pdf[p.name] = stats
+    # calculate error
+    tournament_elo_loss = np.round(sum(telo_err)/len(telo_err),5)
+    tournament_glicko_loss = np.round(sum(tglicko_err)/len(tglicko_err),5)
+    tournament_log5_loss = np.round(sum(tl5_err)/len(tl5_err),5)
+    all_elo_loss.append(tournament_elo_loss)
+    all_glicko_loss.append(tournament_glicko_loss)
+    all_log5_loss.append(tournament_log5_loss)
+
 
 player_ratings = pd.DataFrame.from_dict(pdf, orient='index')
-player_ratings.reset_index()
+player_ratings.index.name=('name')
+player_ratings = player_ratings.reset_index('name')
+player_ratings = player_ratings.sort_values(by='glicko',ascending=False)
+print(player_ratings.head(50))
 player_ratings = player_ratings.sort_values(by='ielo',ascending=False)
-print(player_ratings)
+print(player_ratings.head(50))
+
+player_ratings.to_csv('./data/current_player_ratings.csv',index=False)
+
+print('TOTAL AVERAGE ELO LOSS', str(np.round(sum(all_elo_loss)/len(all_elo_loss),5)))
+print('TOTAL AVERAGE GLICKO LOSS', str(np.round(sum(all_glicko_loss)/len(all_glicko_loss),5)))
+print('TOTAL AVERAGE LOG5 LOSS', str(np.round(sum(all_log5_loss)/len(all_log5_loss),5)))
+
+
+print('TOTAL R1 ELO LOSS', str(np.round(sum(all_r1e_errors)/len(all_r1e_errors),5)))
+print('TOTAL R2 ELO LOSS', str(np.round(sum(all_r2e_errors)/len(all_r2e_errors),5)))
+print('TOTAL R3 ELO LOSS', str(np.round(sum(all_r3e_errors)/len(all_r3e_errors),5)))
+print('TOTAL R4 ELO LOSS', str(np.round(sum(all_r4e_errors)/len(all_r4e_errors),5)))
+
+print('TOTAL R1 ELO LOSS', str(np.round(sum(all_r1g_errors)/len(all_r1g_errors),5)))
+print('TOTAL R2 ELO LOSS', str(np.round(sum(all_r2g_errors)/len(all_r2g_errors),5)))
+print('TOTAL R3 ELO LOSS', str(np.round(sum(all_r3g_errors)/len(all_r3g_errors),5)))
+print('TOTAL R4 ELO LOSS', str(np.round(sum(all_r4g_errors)/len(all_r4g_errors),5)))
+
+# print('AVERAGE NUM OPPONENTS', str(np.round(sum(all_num_opps)/len(all_num_opps),5)))
 
 
 

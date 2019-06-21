@@ -19,7 +19,7 @@ glicko_set = {
     'epsilon':0.000001,
     'ratio':173.7178,
     # how fast does uncertainty increase?
-    'u_i':1.6374
+    'u_i':1.30
 }
 
 

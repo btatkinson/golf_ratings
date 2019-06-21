@@ -1,9 +1,12 @@
 
 import sys
 import numpy as np
+from numpy.polynomial.polynomial import polyfit
 import pandas as pd
 import gc
 import re
+import datetime
+import matplotlib.pyplot as plt
 
 from settings import *
 from helpers import *
@@ -69,15 +72,19 @@ all_elo_loss = []
 all_glicko_loss = []
 all_log5_loss = []
 
-all_r1e_errors = []
-all_r2e_errors = []
-all_r3e_errors = []
-all_r4e_errors = []
+# elo & glicko by rounds played
 
-all_r1g_errors = []
-all_r2g_errors = []
-all_r3g_errors = []
-all_r4g_errors = []
+
+# track error round by round
+# all_r1e_errors = []
+# all_r2e_errors = []
+# all_r3e_errors = []
+# all_r4e_errors = []
+#
+# all_r1g_errors = []
+# all_r2g_errors = []
+# all_r3g_errors = []
+# all_r4g_errors = []
 
 
 # all_num_opps = []
@@ -92,15 +99,12 @@ for index, row in tqdm(sdf.iterrows()):
     tlb = get_tournament_leaderboard(row)
     start_date = tlb['start_date'].mode()[0]
 
-    if row['name'] == 'ANZChampionship':
-        print("FIX THIS")
+    ## for testing ##
+    dt_start = datetime.datetime.strptime(str(start_date), '%b %d %Y').date()
+    if dt_start <= datetime.datetime.strptime('Jan 01 2019', '%b %d %Y').date():
         continue
-    if row['name'] == 'Reno-TahoeOpen':
-        print("FIX THIS 2012")
-        continue
-    if row['name'] == 'BarracudaChampionship':
-        print("FIX THIS 2014")
-        continue
+
+    print(row['name'], row['season'])
 
     # list to contain player objects
     plist = []
@@ -109,6 +113,10 @@ for index, row in tqdm(sdf.iterrows()):
     telo_err = []
     tglicko_err = []
     tl5_err = []
+
+    # by rounds played error tracking
+    elo_brp = []
+    glicko_brp = []
 
     # possible options to speed up here
     # could try subtracting sets, then multiple key lookup using pydash or itemgetter
@@ -205,8 +213,7 @@ for index, row in tqdm(sdf.iterrows()):
             margin = abs(p2_score - p1_score)
             if p1_score <= p2_score:
                 # player 1 is winner/draw
-                # log5_x = l5_x(p1.wl,p2.wl)
-                log5_x = p1.wl
+                log5_x = l5_x(p1.wl,p2.wl)
                 if p1_score == p2_score:
                     p1.add_tie()
                     p2.add_tie()
@@ -223,8 +230,7 @@ for index, row in tqdm(sdf.iterrows()):
                     result = 1
             else:
                 # player 2 is winner
-                # log5_x = l5_x(p1.wl,p2.wl)
-                log5_x = p1.wl
+                log5_x = l5_x(p1.wl,p2.wl)
                 p2.add_win()
                 p1.add_loss()
                 # order of arguments matters
@@ -237,14 +243,17 @@ for index, row in tqdm(sdf.iterrows()):
             elo_error = cross_entropy(x, result)
             l5_error = cross_entropy(log5_x, result)
             telo_err.append(elo_error)
-            if round == 'R1':
-                all_r1e_errors.append(elo_error)
-            if round == 'R2':
-                all_r2e_errors.append(elo_error)
-            if round == 'R3':
-                all_r3e_errors.append(elo_error)
-            if round == 'R4':
-                all_r4e_errors.append(elo_error)
+
+            elo_brp.append([p1.rnds_played, elo_error])
+            elo_brp.append([p2.rnds_played, elo_error])
+            # if round == 'R1':
+            #     all_r1e_errors.append(elo_error)
+            # if round == 'R2':
+            #     all_r2e_errors.append(elo_error)
+            # if round == 'R3':
+            #     all_r3e_errors.append(elo_error)
+            # if round == 'R4':
+            #     all_r4e_errors.append(elo_error)
             tl5_err.append(l5_error)
             change_dict[p1.name] += p1_change
             change_dict[p2.name] += p2_change
@@ -273,16 +282,22 @@ for index, row in tqdm(sdf.iterrows()):
                     result = 1
                 results.append([opponent, result])
             # Glicko class edits glicko rating of
-            new_pobj, glicko_error = Glicko.update(pobj, results)
-            if round == 'R1':
-                all_r1g_errors.append(glicko_error)
-            if round == 'R2':
-                all_r2g_errors.append(glicko_error)
-            if round == 'R3':
-                all_r3g_errors.append(glicko_error)
-            if round == 'R4':
-                all_r4g_errors.append(glicko_error)
+            new_pobj, glicko_error, brp = Glicko.update(pobj, results)
+
+            # for tracking round by round error
+            # if round == 'R1':
+            #     all_r1g_errors.append(glicko_error)
+            # if round == 'R2':
+            #     all_r2g_errors.append(glicko_error)
+            # if round == 'R3':
+            #     all_r3g_errors.append(glicko_error)
+            # if round == 'R4':
+            #     all_r4g_errors.append(glicko_error)
+
             tglicko_err.append(glicko_error)
+            # adding by rounds played
+            for ebrp in brp:
+                glicko_brp.append(ebrp)
             new_pobjs.append(new_pobj)
         # reset all the player objects with the new ratings
         good_plist = new_pobjs
@@ -324,16 +339,51 @@ print('TOTAL AVERAGE ELO LOSS', str(np.round(sum(all_elo_loss)/len(all_elo_loss)
 print('TOTAL AVERAGE GLICKO LOSS', str(np.round(sum(all_glicko_loss)/len(all_glicko_loss),5)))
 print('TOTAL AVERAGE LOG5 LOSS', str(np.round(sum(all_log5_loss)/len(all_log5_loss),5)))
 
+print('LENGTH OF ELO BRP', len(elo_brp))
+print('LENGTH OF Glicko BRP', len(glicko_brp))
 
-print('TOTAL R1 ELO LOSS', str(np.round(sum(all_r1e_errors)/len(all_r1e_errors),5)))
-print('TOTAL R2 ELO LOSS', str(np.round(sum(all_r2e_errors)/len(all_r2e_errors),5)))
-print('TOTAL R3 ELO LOSS', str(np.round(sum(all_r3e_errors)/len(all_r3e_errors),5)))
-print('TOTAL R4 ELO LOSS', str(np.round(sum(all_r4e_errors)/len(all_r4e_errors),5)))
+elo_brp_df = pd.DataFrame(elo_brp,columns=['Rnds_Played', 'Error'])
+elo_brp_gb = elo_brp_df.groupby(['Rnds_Played']).mean()
+elo_brp_gb = elo_brp_gb.reset_index()
 
-print('TOTAL R1 ELO LOSS', str(np.round(sum(all_r1g_errors)/len(all_r1g_errors),5)))
-print('TOTAL R2 ELO LOSS', str(np.round(sum(all_r2g_errors)/len(all_r2g_errors),5)))
-print('TOTAL R3 ELO LOSS', str(np.round(sum(all_r3g_errors)/len(all_r3g_errors),5)))
-print('TOTAL R4 ELO LOSS', str(np.round(sum(all_r4g_errors)/len(all_r4g_errors),5)))
+glicko_brp_df = pd.DataFrame(glicko_brp,columns=['Rnds_Played', 'Error'])
+glicko_brp_gb = glicko_brp_df.groupby(['Rnds_Played']).mean()
+glicko_brp_gb = glicko_brp_gb.reset_index()
+
+elo_x = elo_brp_gb.Rnds_Played
+elo_y = elo_brp_gb.Error
+
+glicko_x = glicko_brp_gb.Rnds_Played
+glicko_y = glicko_brp_gb.Error
+
+fig, ax = plt.subplots(figsize=(15,7))
+plt.scatter(elo_x, elo_y)
+plt.scatter(glicko_x, glicko_y)
+
+# fit line to them
+b1, m1 = polyfit(elo_x, elo_y, 1)
+b2, m2 = polyfit(glicko_x, glicko_y, 1)
+
+plt.plot(elo_x, b1 + m1 * elo_x, '-', label="Elo")
+plt.plot(glicko_x, b2 + m2 * glicko_x, '-', label="Glicko")
+
+plt.xlabel("Rounds Played")
+plt.ylabel("Error")
+# xint = range(0, math.ceil(17)+1)
+# plt.xticks(xint)
+plt.legend(loc='upper left')
+
+plt.show()
+
+# print('TOTAL R1 ELO LOSS', str(np.round(sum(all_r1e_errors)/len(all_r1e_errors),5)))
+# print('TOTAL R2 ELO LOSS', str(np.round(sum(all_r2e_errors)/len(all_r2e_errors),5)))
+# print('TOTAL R3 ELO LOSS', str(np.round(sum(all_r3e_errors)/len(all_r3e_errors),5)))
+# print('TOTAL R4 ELO LOSS', str(np.round(sum(all_r4e_errors)/len(all_r4e_errors),5)))
+#
+# print('TOTAL R1 ELO LOSS', str(np.round(sum(all_r1g_errors)/len(all_r1g_errors),5)))
+# print('TOTAL R2 ELO LOSS', str(np.round(sum(all_r2g_errors)/len(all_r2g_errors),5)))
+# print('TOTAL R3 ELO LOSS', str(np.round(sum(all_r3g_errors)/len(all_r3g_errors),5)))
+# print('TOTAL R4 ELO LOSS', str(np.round(sum(all_r4g_errors)/len(all_r4g_errors),5)))
 
 # print('AVERAGE NUM OPPONENTS', str(np.round(sum(all_num_opps)/len(all_num_opps),5)))
 

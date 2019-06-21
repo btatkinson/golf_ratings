@@ -81,6 +81,8 @@ class Glicko(object):
         diff = 0
         # tracking error
         all_errors = []
+        # also tracking error, but by round (added later)
+        glicko_ebr = []
         for opp, result in opps:
             opp_mu = (opp.glicko - MU)/ratio
             opp_phi = opp.gvar/ratio
@@ -90,6 +92,8 @@ class Glicko(object):
             expected_result = self.get_expected(mu, opp_mu, impact)
             match_error = cross_entropy(expected_result, result)
             all_errors.append(match_error)
+            glicko_ebr.append([player.rnds_played,match_error])
+            glicko_ebr.append([opp.rnds_played,match_error])
             var_inv += impact ** 2 * expected_result * (1 - expected_result)
             diff += impact * (result - expected_result)
             dsq_inv += (expected_result * (1 - expected_result) * (Q ** 2) * (impact ** 2))
@@ -111,7 +115,7 @@ class Glicko(object):
 
         error = sum(all_errors)/len(all_errors)
 
-        return player, error
+        return player, error, glicko_ebr
 
 
 # end

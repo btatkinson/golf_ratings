@@ -85,12 +85,8 @@ class Player(object):
         elif self.cdate is None:
             return None
         else:
-            try:
-                last_date = datetime.datetime.strptime(str(self.ldate), '%b %d %Y').date()
-                current_date = datetime.datetime.strptime(str(self.cdate), '%b %d %Y').date()
-                dsl = current_date - last_date
-                days = dsl.days
-            except:
-                print("FIX THIS OMEGA EURO MASTERS 2016")
-                days = 0
+            last_date = datetime.datetime.strptime(str(self.ldate), '%b %d %Y').date()
+            current_date = datetime.datetime.strptime(str(self.cdate), '%b %d %Y').date()
+            dsl = current_date - last_date
+            days = dsl.days
         return days

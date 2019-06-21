@@ -37,10 +37,16 @@ def add_uncertainty(gvar, days_since):
 name_dict = {
     'III Davis Love':'Davis Love III',
     'III Charles Howell':'Charles Howell III',
+    'III Harold Varner':'Harold Varner III',
     'PELT Bo Van':'Bo Van Pelt',
     'Miguel Ángel Jiménez':'Miguel Angel Jiménez',
     'K J Choi':'K.J. Choi',
-    'Rory Mcilroy':'Rory McIlroy'
+    'Rory Mcilroy':'Rory McIlroy',
+    'BELLO Rafa Cabrera':'Rafa Cabrera Bello',
+    'Bryson Dechambeau':'Bryson DeChambeau',
+    'Erik Van Rooyen':'Erik van Rooyen',
+    'ROOYEN Erik Van':'Erik van Rooyen',
+    'Cheng Tsung Pan':'C.T. Pan'
 }
 
 def name_pp(name):

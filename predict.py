@@ -21,6 +21,10 @@ field.append('Bryson DeChambeau')
 # field player ratings
 fpr = pr.loc[pr['name'].isin(field)]
 
+print(fpr)
+
+raise ValueError()
+
 def get_expected(pairs):
     global Elo
     global Glicko
@@ -48,20 +52,23 @@ def get_expected(pairs):
     return row
 
 pairs = [
-['Ryan Moore','Byeong Hun An', '-125'],
-['C.T. Pan','Brian Harman', '-125'],
-['Brandt Snedeker','Patrick Reed', '-125'],
+['Ryan Moore','Byeong Hun An'],
+['C.T. Pan','Brian Harman'],
+['Brandt Snedeker','Patrick Reed'],
 ['Francesco Molinari','Justin Thomas'],
 ['Brooks Koepka','Patrick Cantlay'],
 ['Tony Finau','Bubba Watson'],
 ['Viktor Hovland','Charlie Hoffman'],
+['Viktor Hovland','Daniel Berger'],
 ['Russell Knox','Phil Mickelson'],
 ['Bryson DeChambeau','Tommy Fleetwood'],
 ['Daniel Berger','Adam Hadwin'],
 ['Kevin Kisner','Keegan Bradley'],
 ['Jason Day','Paul Casey'],
 ['Jordan Spieth','Marc Leishman'],
-['Kevin Streelman','Louis Oosthuizen']
+['Kevin Streelman','Louis Oosthuizen'],
+['Bubba Watson', 'Brooks Koepka'],
+['Matthew Wolff','Kevin Tway']
 ]
 
 Elo = Elo()
@@ -80,7 +87,6 @@ mdf['Model'] = mdf['Model'].round(4)
 
 def pct_to_odds(x):
     x *= 100
-    print(x)
     if x >= 50:
         y = 0 - (x/(100 - x)) * 100
     else:
@@ -91,5 +97,6 @@ def pct_to_odds(x):
 mdf['Line P1'] = mdf['Model'].apply(lambda x: pct_to_odds(x))
 mdf['Line P2'] = mdf['Model'].apply(lambda x: pct_to_odds(1-x))
 
-print(mdf[['Player 1', 'Player 2', 'Model', 'Line P1', 'Line P2']])
+print(mdf)
+# print(mdf[['Player 1', 'Player 2', 'Model', 'Line P1', 'Line P2']])
 # end

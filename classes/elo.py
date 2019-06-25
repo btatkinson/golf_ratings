@@ -38,7 +38,7 @@ class Elo(object):
         acp = self.get_acp(elo_diff)
         return movm * acp
 
-    def get_k(self,rp,num_opps):
+    def get_k(self, rp, ds, num_opps, round):
         # dimish as function of number of rp
         K = self.K
 
@@ -46,18 +46,48 @@ class Elo(object):
 
         K *= rpf
 
-        m = 1
+        # diminishing returns for larger field
         m = 100/num_opps
-        m = (m - 1)/4
-        m = m+1
+        m = (m - 1)/1.5
+        m += 1
+        K*=m
 
-        return K*m
+        # decreasing K during the tournament leads to better round by round errors
+        # however, it leads to worse scores at the next tournament round 1
 
-    def get_ielo_delta(self, prob, margin, p1, p2, num_opps):
+        # if round == 'R1':
+        #     K *= 0.96
+        # if round == 'R2':
+        #     K *= 0.96
+        # if round == 'R3':
+        #     K *= 0.96
+        # if round == 'R4':
+        #     K *= 1.05
+
+
+        # increase K after long layoff
+        # convert to week units
+        # ws = ds/7
+
+        # 3-5 years (208 weeks since), layoff factor would be around 2.5
+        # two weeks, layoff factor would be about 1
+        # just trying linear first
+        # if round == 'R1':
+        #     lf = 0.94 + .02*ws
+        # elif round == 'R2':
+        #     lf = 0.94 + .015*ws
+        # else:
+        #     lf = 1
+        #
+        # K *= lf
+
+        return K
+
+    def get_ielo_delta(self, prob, margin, p1, p2, num_opps, round):
         gamma = self.get_gamma(margin, (p1.elo-p2.elo))
 
-        p1_K = self.get_k(p1.rnds_played, num_opps)
-        p2_K = self.get_k(p2.rnds_played, num_opps)
+        p1_K = self.get_k(p1.rnds_played, p1.days_since, num_opps, round)
+        p2_K = self.get_k(p2.rnds_played, p2.days_since, num_opps, round)
 
         p1_delta = (p1_K * gamma) * (1 - prob)
         p2_delta = -((p2_K * gamma) * (1 - prob))

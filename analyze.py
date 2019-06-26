@@ -8,14 +8,14 @@ import gc
 
 ######## Correlation of ranking systems ##################
 
-rnks = pd.read_csv('./data/rating_comp.csv')
-
-sans_plyr = rnks.drop(columns='Player')
-
-corr = sans_plyr.corr()
-sns.heatmap(corr, cbar=True, annot=True, cmap='inferno', square=True);
-# plt.imshow(corr, cmap='viridis', interpolation='nearest')
-plt.show()
+# rnks = pd.read_csv('./data/rating_comp.csv')
+#
+# sans_plyr = rnks.drop(columns='Player')
+#
+# corr = sans_plyr.corr()
+# sns.heatmap(corr, cbar=True, annot=True, cmap='inferno', square=True);
+# # plt.imshow(corr, cmap='viridis', interpolation='nearest')
+# plt.show()
 
 #################### Season by Season Error #######################
 
@@ -66,54 +66,63 @@ plt.show()
 # plt.show()
 ############# Round by Round error #########################
 
-# l5_rbr = pd.read_csv('./data/rbr/log_5.csv')
-# elo_rbr = pd.read_csv('./data/rbr/elo.csv')
-# glicko_rbr = pd.read_csv('./data/rbr/glicko.csv')
+# l5_rbr = pd.read_csv('./data/rbr/l5_brp.csv')
+# elo_rbr = pd.read_csv('./data/rbr/elo_brp.csv')
+# glicko_rbr = pd.read_csv('./data/rbr/glicko_brp.csv')
+
+# elo_rbr = elo_rbr.loc[elo_rbr['Rnds_Played'] >= 25]
+# glicko_rbr = glicko_rbr.loc[glicko_rbr['Rnds_Played'] >= 25]
+# elo_rbr = elo_rbr.loc[elo_rbr['Rnds_Played'] <= 300]
+# glicko_rbr = glicko_rbr.loc[glicko_rbr['Rnds_Played'] <= 300]
+
 #
 # l5_x = l5_rbr.Rnds_Played.values
 # l5_y = l5_rbr.Error.values
 #
 # elo_x = elo_rbr.Rnds_Played.values
 # elo_y = elo_rbr.Error.values
-#
+# #
 # glicko_x = glicko_rbr.Rnds_Played.values
 # glicko_y = glicko_rbr.Error.values
 #
 # # l5_x = [math.log(x+1,10) for x in l5_x]
 # # elo_x = [math.log(x+1,10) for x in elo_x]
 # # glicko_x = [math.log(x+1,10) for x in glicko_x]
-#
+
+
 # b1, m1 = polyfit(l5_x, l5_y, 1)
 # b2, m2 = polyfit(elo_x, elo_y, 1)
 # b3, m3 = polyfit(glicko_x, glicko_y, 1)
-#
+
+# print('Elo Slope: ', m2*100000)
+# print('Glicko Slope: ', m3*100000)
+# #
 # fig, ax = plt.subplots(figsize=(15,7))
 #
-# plt.scatter(l5_x, l5_y, color="black", label='Log5')
+# plt.scatter(l5_x, l5_y, color="black", label=None)
 # plt.scatter(elo_x, elo_y, color="blue", label=None)
 # plt.scatter(glicko_x, glicko_y, color="red", label=None)
 #
+# l5_line_y = []
+# for x in l5_x:
+#     l5_line_y.append(x * m1 + b1)
 # elo_line_y = []
 # for x in elo_x:
 #     elo_line_y.append(x * m2 + b2)
 # glicko_line_y = []
 # for x in glicko_x:
 #     glicko_line_y.append(x * m3 + b3)
-#
-# # plt.plot(l5_x, l5_line_y, '-', label="Log5")
+# #
+# # plt.plot(l5_x, l5_line_y, 'k-', label="Log5")
 # plt.plot(elo_x, elo_line_y, 'b-', label="Elo")
 # plt.plot(glicko_x, glicko_line_y, 'r-', label="Glicko")
-
-# C0 = -.43
-# l5_y_log = l5_y - C0
-# l5_y_log = [math.log(y) for y in l5_y_log]
-# # l5_y_log = [math.log(y) for y in l5_y_log]
-# K, A_log = np.polyfit(l5_x, l5_y_log, 1)
-# A = np.exp(A_log)
-# print(A,K)
-# A = 5
-# K = -3
-# plt.scatter(l5_x, l5_y_log, label=None)
+#
+# plt.xlabel("Rounds Played")
+# plt.ylabel("Error")
+# plt.legend(loc='upper left')
+# plt.title('Error by Rounds Played')
+#
+# plt.show()
 
 
 # print(A,K)

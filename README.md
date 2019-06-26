@@ -13,7 +13,9 @@ The path I use for loading tournament leaderboards is: '../golf_scraper/leaderbo
 I don't use any exotic packages, I think all are standard python data science tools. The packages I use to plot might be unique, especially [seaborn](https://seaborn.pydata.org/).
 
 ### Running
-The biggest challenge to replicating this repo yourself will be supplying the data. I tried to comment the code as best I could, but as this was a personal hobby project, I did take shortcuts in a couple of spots and left commented out code in some areas. ``` main.py ``` contains almost all of the logic needed. If you see a function you don't recognize, it probably exists in helpers. I use classes described in the classes folder, including Elo, Glicko, and Player. ``` python3 main.py ``` is what I use to execute.
+The biggest challenge to replicating this repo yourself will be supplying the data. I tried to comment the code as best I could, but as this was a personal hobby project, I did take shortcuts in a couple of spots and left commented out code in some areas. ``` main.py ``` contains almost all of the logic needed. If you see a function you don't recognize, it probably exists in ```helpers.py```. I use classes described in the classes folder, including Elo, Glicko, and Player. ``` python3 main.py ``` is what I use to execute.
+
+I separated out the file to create graphs. That's ```analyze.py```. It's not fun to parse through, because it's full of temporary code meant for discard. I kept it in case a Medium reader wanted to see it.
 
 I quickly wrote ```predict.py``` to predict matchups in the 2019 Traveler's championship. It's far from perfect but it's a good start to using the ratings to predict matchups.
 

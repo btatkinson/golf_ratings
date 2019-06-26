@@ -21,7 +21,8 @@ from player import Player
 from glicko import Glicko
 from elo import Elo
 
-CALC_LOG_5=True
+gc.collect()
+CALC_LOG_5=False
 
 def get_tournament_leaderboard(row):
     name = row['name']
@@ -78,28 +79,28 @@ all_l5_loss = []
 # elo & glicko by rounds played
 
 # track error by season
-season_errors = {}
-season_errors['errors'] = {}
-season_errors['counts'] = {}
-
-tours = ['PGA','Euro']
-
-seasons = list(sdf.season.unique())
-for season in seasons:
-    str_season = str(season)
-    season_errors['errors'][str_season] = {}
-    season_errors['counts'][str_season] = {}
-    for tour in tours:
-        season_errors['errors'][str_season][tour] = {}
-        season_errors['counts'][str_season][tour] = {}
-
-        season_errors['errors'][str_season][tour]['elo'] = 0
-        season_errors['errors'][str_season][tour]['glicko'] = 0
-        season_errors['errors'][str_season][tour]['l5'] = 0
-
-        season_errors['counts'][str_season][tour]['elo'] = .0001
-        season_errors['counts'][str_season][tour]['glicko'] = .0001
-        season_errors['counts'][str_season][tour]['l5'] = .0001
+# season_errors = {}
+# season_errors['errors'] = {}
+# season_errors['counts'] = {}
+#
+# tours = ['PGA','Euro']
+#
+# seasons = list(sdf.season.unique())
+# for season in seasons:
+#     str_season = str(season)
+#     season_errors['errors'][str_season] = {}
+#     season_errors['counts'][str_season] = {}
+#     for tour in tours:
+#         season_errors['errors'][str_season][tour] = {}
+#         season_errors['counts'][str_season][tour] = {}
+#
+#         season_errors['errors'][str_season][tour]['elo'] = 0
+#         season_errors['errors'][str_season][tour]['glicko'] = 0
+#         season_errors['errors'][str_season][tour]['l5'] = 0
+#
+#         season_errors['counts'][str_season][tour]['elo'] = .0001
+#         season_errors['counts'][str_season][tour]['glicko'] = .0001
+#         season_errors['counts'][str_season][tour]['l5'] = .0001
 
 # track error round by round
 # all_r1e_errors = []
@@ -111,6 +112,10 @@ for season in seasons:
 # all_r2g_errors = []
 # all_r3g_errors = []
 # all_r4g_errors = []
+
+elo_brp = []
+glicko_brp = []
+l5_brp = []
 
 for index, row in tqdm(sdf.iterrows()):
 
@@ -125,9 +130,9 @@ for index, row in tqdm(sdf.iterrows()):
     season = str(row['season'])
 
     # for testing ##
-    # dt_start = datetime.datetime.strptime(str(start_date), '%b %d %Y').date()
-    # if dt_start <= datetime.datetime.strptime('Jan 01 2017', '%b %d %Y').date():
-    #     continue
+    dt_start = datetime.datetime.strptime(str(start_date), '%b %d %Y').date()
+    if dt_start <= datetime.datetime.strptime('Aug 01 2015', '%b %d %Y').date():
+        continue
 
     # print(row['name'], row['season'])
 
@@ -141,11 +146,6 @@ for index, row in tqdm(sdf.iterrows()):
 
     # track round error
     relo_errors = []
-
-    # by rounds played error tracking
-    elo_brp = []
-    # glicko_brp = []
-    # l5_brp = []
 
     # possible options to speed up here
     # could try subtracting sets, then multiple key lookup using pydash or itemgetter
@@ -271,7 +271,8 @@ for index, row in tqdm(sdf.iterrows()):
                 result = 0
 
             elo_error = cross_entropy(x, result)
-            elo_brp.append([(p1.rnds_played + p2.rnds_played), elo_error])
+            elo_brp.append([p1.rnds_played, elo_error])
+            elo_brp.append([p2.rnds_played, elo_error])
             telo_err.append(elo_error)
             # if round == 'R1':
             #     all_r1e_errors.append(elo_error)
@@ -284,6 +285,8 @@ for index, row in tqdm(sdf.iterrows()):
 
             if CALC_LOG_5:
                 l5_error = cross_entropy(log5_x, result)
+                l5_brp.append([p1.rnds_played, l5_error])
+                l5_brp.append([p2.rnds_played, l5_error])
                 tl5_err.append(l5_error)
 
             change_dict[p1.name] += p1_change
@@ -331,8 +334,8 @@ for index, row in tqdm(sdf.iterrows()):
 
             tglicko_err.append(glicko_error)
             # adding by rounds played
-            # for ebrp in brp:
-            #     glicko_brp.append(ebrp)
+            for ebrp in brp:
+                glicko_brp.append(ebrp)
             new_pobjs.append(new_pobj)
         # reset all the player objects with the new ratings
         good_plist = new_pobjs
@@ -351,21 +354,22 @@ for index, row in tqdm(sdf.iterrows()):
     tournament_glicko_loss = np.round(sum(tglicko_err)/len(tglicko_err),5)
     all_elo_loss.append(tournament_elo_loss)
     all_glicko_loss.append(tournament_glicko_loss)
+
     if CALC_LOG_5:
         tournament_l5_loss = np.round(sum(tl5_err)/len(tl5_err),5)
         all_l5_loss.append(tournament_l5_loss)
 
-    season_errors['errors'][str(season)][row['tour']]['elo'] += tournament_elo_loss
-
-    season_errors['errors'][str(season)][row['tour']]['glicko'] += tournament_glicko_loss
-
-    season_errors['errors'][str(season)][row['tour']]['l5'] += tournament_l5_loss
-
-    season_errors['counts'][str(season)][row['tour']]['elo'] += 1
-
-    season_errors['counts'][str(season)][row['tour']]['glicko'] += 1
-
-    season_errors['counts'][str(season)][row['tour']]['l5'] += 1
+    # season_errors['errors'][str(season)][row['tour']]['elo'] += tournament_elo_loss
+    #
+    # season_errors['errors'][str(season)][row['tour']]['glicko'] += tournament_glicko_loss
+    #
+    # season_errors['errors'][str(season)][row['tour']]['l5'] += tournament_l5_loss
+    #
+    # season_errors['counts'][str(season)][row['tour']]['elo'] += 1
+    #
+    # season_errors['counts'][str(season)][row['tour']]['glicko'] += 1
+    #
+    # season_errors['counts'][str(season)][row['tour']]['l5'] += 1
 
 
 
@@ -383,23 +387,37 @@ print('TOTAL AVERAGE ELO LOSS', str(np.round(sum(all_elo_loss)/len(all_elo_loss)
 print('TOTAL AVERAGE GLICKO LOSS', str(np.round(sum(all_glicko_loss)/len(all_glicko_loss),5)))
 if CALC_LOG_5:
     print('TOTAL AVERAGE LOG5 LOSS', str(np.round(sum(all_l5_loss)/len(all_l5_loss),5)))
-    # l5_brp_df = pd.DataFrame(l5_brp,columns=['Rnds_Played', 'Error'])
-    # l5_brp_gb = l5_brp_df.groupby(['Rnds_Played']).count()
-    # l5_brp_gb = l5_brp_gb.reset_index()
-    # l5_brp_gb.to_csv('./data/rbr/log_5_counts.csv',index='False')
+    l5_brp_df = pd.DataFrame(l5_brp,columns=['Rnds_Played', 'Error'])
+    l5_brp_gb = l5_brp_df.groupby(['Rnds_Played']).count()
+    l5_brp_gb = l5_brp_gb.reset_index()
+    l5_brp_gb.to_csv('./data/rbr/log_5_counts.csv',index='False')
 
-# elo_brp_df = pd.DataFrame(elo_brp,columns=['Rnds_Played', 'Error'])
-# print('TOTAL BY ROUNDS PLAYED ERROR COUNT', len(elo_brp_df))
-# elo_brp_gb = elo_brp_df.groupby(['Rnds_Played']).count()
-# elo_brp_gb = elo_brp_gb.reset_index()
+elo_brp_df = pd.DataFrame(elo_brp,columns=['Rnds_Played', 'Error'])
+print('TOTAL BY ROUNDS PLAYED ERROR COUNT', len(elo_brp_df))
+elo_brp_gb = elo_brp_df.groupby(['Rnds_Played']).mean()
+elo_brp_gb = elo_brp_gb.reset_index()
+
+elo_brp_count = elo_brp_df.groupby(['Rnds_Played']).count()
+elo_brp_count = elo_brp_count.reset_index()
 #
-# glicko_brp_df = pd.DataFrame(glicko_brp,columns=['Rnds_Played', 'Error'])
-# glicko_brp_gb = glicko_brp_df.groupby(['Rnds_Played']).mean()
-# glicko_brp_gb = glicko_brp_gb.reset_index()
+glicko_brp_df = pd.DataFrame(glicko_brp,columns=['Rnds_Played', 'Error'])
+glicko_brp_gb = glicko_brp_df.groupby(['Rnds_Played']).mean()
+glicko_brp_gb = glicko_brp_gb.reset_index()
+
+glicko_brp_count = glicko_brp_df.groupby(['Rnds_Played']).count()
+glicko_brp_count = glicko_brp_count.reset_index()
+
+# l5_brp_df = pd.DataFrame(l5_brp,columns=['Rnds_Played', 'Error'])
+# l5_brp_gb = l5_brp_df.groupby(['Rnds_Played']).mean()
+# l5_brp_gb = l5_brp_gb.reset_index()
 
 # groupby data to csv
 elo_brp_gb.to_csv('./data/rbr/elo_brp.csv',index='False')
-# glicko_brp_gb.to_csv('./data/rbr/glicko_counts.csv',index='False')
+glicko_brp_gb.to_csv('./data/rbr/glicko_brp.csv',index='False')
+# l5_brp_gb.to_csv('./data/rbr/l5_brp.csv',index='False')
+
+elo_brp_count.to_csv('./data/rbr/elo_brp_count.csv',index='False')
+glicko_brp_count.to_csv('./data/rbr/glicko_brp_count.csv',index='False')
 
 # print('TOTAL R1 ELO LOSS', str(np.round(sum(all_r1e_errors)/len(all_r1e_errors),5)))
 # print('TOTAL R2 ELO LOSS', str(np.round(sum(all_r2e_errors)/len(all_r2e_errors),5)))
@@ -411,19 +429,19 @@ elo_brp_gb.to_csv('./data/rbr/elo_brp.csv',index='False')
 # print('TOTAL R3 GLICKO LOSS', str(np.round(sum(all_r3g_errors)/len(all_r3g_errors),5)))
 # print('TOTAL R4 GLICKO LOSS', str(np.round(sum(all_r4g_errors)/len(all_r4g_errors),5)))
 
-ses = []
-systems = ['elo','glicko','l5']
-for season in seasons:
-    for tour in tours:
-        for system in systems:
-            er = season_errors['errors'][str(season)][tour][system]
-            count = season_errors['counts'][str(season)][tour][system]
-            er_avg = er/count
-            ses.append([season, tour, system, er_avg])
-
-sea_by_sea = pd.DataFrame(ses, columns=['Season','Tour', 'System', 'Error'])
-
-sea_by_sea.to_csv('./data/sea_by_sea.csv')
+# ses = []
+# systems = ['elo','glicko','l5']
+# for season in seasons:
+#     for tour in tours:
+#         for system in systems:
+#             er = season_errors['errors'][str(season)][tour][system]
+#             count = season_errors['counts'][str(season)][tour][system]
+#             er_avg = er/count
+#             ses.append([season, tour, system, er_avg])
+#
+# sea_by_sea = pd.DataFrame(ses, columns=['Season','Tour', 'System', 'Error'])
+#
+# sea_by_sea.to_csv('./data/sea_by_sea.csv')
 
 
 

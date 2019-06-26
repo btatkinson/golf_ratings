@@ -13,9 +13,9 @@ ielo_set = {
 
 glicko_set = {
     'init':1500,
-    'phi':21.5,
+    'phi':20.0,
     'sigma':0.0285,
-    'tau':0.01,
+    'tau':0.009,
     'epsilon':0.000001,
     'ratio':173.7178,
     # how fast does uncertainty increase?

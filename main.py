@@ -20,9 +20,11 @@ sys.path.insert(0, './classes')
 from player import Player
 from glicko import Glicko
 from elo import Elo
+from map import Map
 
 gc.collect()
 CALC_LOG_5=False
+BRP = False
 
 def get_tournament_leaderboard(row):
     name = row['name']
@@ -72,6 +74,9 @@ print(sdf.head())
 Glicko = Glicko()
 Elo = Elo()
 
+# initialize Map
+Map = Map()
+
 all_elo_loss = []
 all_glicko_loss = []
 all_l5_loss = []
@@ -113,28 +118,47 @@ all_l5_loss = []
 # all_r3g_errors = []
 # all_r4g_errors = []
 
-elo_brp = []
-glicko_brp = []
-l5_brp = []
+# elo_brp = []
+# glicko_brp = []
+# l5_brp = []
 
+elo_vs_sg = []
+
+# iterate schedule
 for index, row in tqdm(sdf.iterrows()):
 
     not_valid = validate_tournament(row)
     if not_valid:
         continue
 
+    # tournament start_date
+    start_date = str(row['start_date'])
+    ## for testing ##
+    # # when to begin testing? ##
+    # begin_date = 'Jan 01 2019'
+    # dt_start = datetime.datetime.strptime(str(start_date), '%b %d %Y').date()
+    # if dt_start <= datetime.datetime.strptime(begin_date, '%b %d %Y').date():
+    #     continue
+
+    location = row['location']
+    # since there is only one location not found, skip that tournament
+    if location not in Map.loc_dict:
+        print('Location not found, skipping!')
+        continue
+    else:
+        trn_lat = Map.loc_dict[location]['Latitude']
+        trn_lng = Map.loc_dict[location]['Longitude']
+
+    ##  test
+    # print(row['name'])
+    # bg_lat = 36.9685
+    # bg_lng = -86.4808
+    # dist = get_distance(trn_lat,trn_lng,bg_lat,bg_lng)
+    # print(dist)
     # load tournament leaderboard based on inferred path
     tlb = get_tournament_leaderboard(row)
-    start_date = tlb['start_date'].mode()[0]
 
     season = str(row['season'])
-
-    # for testing ##
-    dt_start = datetime.datetime.strptime(str(start_date), '%b %d %Y').date()
-    if dt_start <= datetime.datetime.strptime('Aug 01 2015', '%b %d %Y').date():
-        continue
-
-    # print(row['name'], row['season'])
 
     # list to contain player objects
     plist = []
@@ -168,7 +192,9 @@ for index, row in tqdm(sdf.iterrows()):
                 gsig = dict['gsig'],
                 ldate = dict['last_date'],
                 cdate = start_date,
-                lloc = dict['last_loc'],
+                llat = dict['llat'],
+                llng = dict['llng'],
+                pr4 = dict['pr4'],
                 cloc = None,
                 R1 = r['R1'],
                 R2 = r['R2'],
@@ -180,6 +206,10 @@ for index, row in tqdm(sdf.iterrows()):
                 matches=dict['matches'],
                 wl=dict['wl']
             )
+            PObj.dist_from_last = get_distance(PObj.llat, PObj.llng, trn_lat, trn_lng)
+            dir = get_direction(trn_lat,trn_lng,PObj.llat,PObj.llng)
+            bearing = get_cardinal(dir)
+            PObj.bearing_from_last = bearing
         # if not in dict, initialize player class with new player settings
         else:
             PObj = Player(
@@ -213,6 +243,9 @@ for index, row in tqdm(sdf.iterrows()):
                 good_plist.append(p)
             else:
                 bad_plist.append(p)
+
+        if len(good_plist) <= 0:
+            continue
         # add uncertainty if it's been awhile since they've played
         # if round == 'R1':
         #     for p in good_plist:
@@ -230,8 +263,34 @@ for index, row in tqdm(sdf.iterrows()):
 
         # track elo changes for everyone
         change_dict = {}
+
+        ## also, tracking elo & strokes gained for map experiment ##
+        rnd_elos = []
+        rnd_scores = []
+        rnd_dists = []
         for p in good_plist:
             change_dict[p.name] = 0
+
+            rnd_elos.append(p.elo)
+            rnd_scores.append(getattr(p, round))
+            rnd_dists.append(p.dist_from_last)
+
+        avg_elo = sum(rnd_elos)/len(rnd_elos)
+        avg_score = sum(rnd_scores)/len(rnd_scores)
+        try:
+            avg_dist = sum(rnd_dists)/len(rnd_dists)
+        except:
+            avg_dist = 0
+
+        for p in good_plist:
+            rnd_score = getattr(p, round)
+            SG = -1 * (rnd_score - avg_score)
+            EG = p.elo - avg_elo
+            try:
+                DG = avg_dist - p.dist_from_last
+            except:
+                DG = 0
+            elo_vs_sg.append([EG,SG,DG,round,p.days_since,p.dist_from_last,p.bearing_from_last,p.pr4])
 
         for combo in combos:
             p1 = combo[0]
@@ -271,8 +330,9 @@ for index, row in tqdm(sdf.iterrows()):
                 result = 0
 
             elo_error = cross_entropy(x, result)
-            elo_brp.append([p1.rnds_played, elo_error])
-            elo_brp.append([p2.rnds_played, elo_error])
+            if BRP:
+                elo_brp.append([p1.rnds_played, elo_error])
+                elo_brp.append([p2.rnds_played, elo_error])
             telo_err.append(elo_error)
             # if round == 'R1':
             #     all_r1e_errors.append(elo_error)
@@ -285,8 +345,9 @@ for index, row in tqdm(sdf.iterrows()):
 
             if CALC_LOG_5:
                 l5_error = cross_entropy(log5_x, result)
-                l5_brp.append([p1.rnds_played, l5_error])
-                l5_brp.append([p2.rnds_played, l5_error])
+                if BRP:
+                    l5_brp.append([p1.rnds_played, l5_error])
+                    l5_brp.append([p2.rnds_played, l5_error])
                 tl5_err.append(l5_error)
 
             change_dict[p1.name] += p1_change
@@ -295,6 +356,10 @@ for index, row in tqdm(sdf.iterrows()):
         # apply changes to player elo & log_5 after round
         for p in good_plist:
             p.elo += change_dict[p.name]
+            if round == 'R4':
+                p.pr4 = True
+            else:
+                p.pr4 = False
 
         if CALC_LOG_5:
             for p in good_plist:
@@ -334,8 +399,9 @@ for index, row in tqdm(sdf.iterrows()):
 
             tglicko_err.append(glicko_error)
             # adding by rounds played
-            for ebrp in brp:
-                glicko_brp.append(ebrp)
+            if BRP:
+                for ebrp in brp:
+                    glicko_brp.append(ebrp)
             new_pobjs.append(new_pobj)
         # reset all the player objects with the new ratings
         good_plist = new_pobjs
@@ -346,8 +412,10 @@ for index, row in tqdm(sdf.iterrows()):
     # update dict
     for p in plist:
         # get stats into dict format
-        stats = {'ielo': p.elo, 'rnds_played': p.rnds_played, 'glicko': p.glicko, 'gvar': p.gvar, 'gsig':p.gsig, 'last_date': start_date, 'last_loc': p.lloc,
-        'wins':p.wins,'losses':p.losses,'ties':p.ties,'matches':p.matches,'wl':p.wl}
+        p.llat = trn_lat
+        p.llng = trn_lng
+        stats = {'ielo': p.elo, 'rnds_played': p.rnds_played, 'glicko': p.glicko, 'gvar': p.gvar, 'gsig':p.gsig, 'last_date': start_date, 'llat': p.llat,
+        'llng': p.llng, 'pr4':p.pr4, 'wins':p.wins,'losses':p.losses,'ties':p.ties,'matches':p.matches,'wl':p.wl}
         pdf[p.name] = stats
     # calculate error
     tournament_elo_loss = np.round(sum(telo_err)/len(telo_err),5)
@@ -372,7 +440,10 @@ for index, row in tqdm(sdf.iterrows()):
     # season_errors['counts'][str(season)][row['tour']]['l5'] += 1
 
 
+comparison = pd.DataFrame(elo_vs_sg, columns=['Elo_Gained','Strokes_Gained','Distance Gained', 'Round','Days_Since','Dist_From_Last','Bearing_From_Last','PR4'])
+comparison.to_csv('./data/elo_vs_sg.csv',index=False)
 
+raise ValueError('Done Testing')
 player_ratings = pd.DataFrame.from_dict(pdf, orient='index')
 player_ratings.index.name=('name')
 player_ratings = player_ratings.reset_index('name')
@@ -387,37 +458,39 @@ print('TOTAL AVERAGE ELO LOSS', str(np.round(sum(all_elo_loss)/len(all_elo_loss)
 print('TOTAL AVERAGE GLICKO LOSS', str(np.round(sum(all_glicko_loss)/len(all_glicko_loss),5)))
 if CALC_LOG_5:
     print('TOTAL AVERAGE LOG5 LOSS', str(np.round(sum(all_l5_loss)/len(all_l5_loss),5)))
-    l5_brp_df = pd.DataFrame(l5_brp,columns=['Rnds_Played', 'Error'])
-    l5_brp_gb = l5_brp_df.groupby(['Rnds_Played']).count()
-    l5_brp_gb = l5_brp_gb.reset_index()
-    l5_brp_gb.to_csv('./data/rbr/log_5_counts.csv',index='False')
+    if BRP:
+        l5_brp_df = pd.DataFrame(l5_brp,columns=['Rnds_Played', 'Error'])
+        l5_brp_gb = l5_brp_df.groupby(['Rnds_Played']).count()
+        l5_brp_gb = l5_brp_gb.reset_index()
+        l5_brp_gb.to_csv('./data/rbr/log_5_counts.csv',index='False')
 
-elo_brp_df = pd.DataFrame(elo_brp,columns=['Rnds_Played', 'Error'])
-print('TOTAL BY ROUNDS PLAYED ERROR COUNT', len(elo_brp_df))
-elo_brp_gb = elo_brp_df.groupby(['Rnds_Played']).mean()
-elo_brp_gb = elo_brp_gb.reset_index()
+if BRP:
+    elo_brp_df = pd.DataFrame(elo_brp,columns=['Rnds_Played', 'Error'])
+    print('TOTAL BY ROUNDS PLAYED ERROR COUNT', len(elo_brp_df))
+    elo_brp_gb = elo_brp_df.groupby(['Rnds_Played']).mean()
+    elo_brp_gb = elo_brp_gb.reset_index()
 
-elo_brp_count = elo_brp_df.groupby(['Rnds_Played']).count()
-elo_brp_count = elo_brp_count.reset_index()
-#
-glicko_brp_df = pd.DataFrame(glicko_brp,columns=['Rnds_Played', 'Error'])
-glicko_brp_gb = glicko_brp_df.groupby(['Rnds_Played']).mean()
-glicko_brp_gb = glicko_brp_gb.reset_index()
+    elo_brp_count = elo_brp_df.groupby(['Rnds_Played']).count()
+    elo_brp_count = elo_brp_count.reset_index()
+    #
+    glicko_brp_df = pd.DataFrame(glicko_brp,columns=['Rnds_Played', 'Error'])
+    glicko_brp_gb = glicko_brp_df.groupby(['Rnds_Played']).mean()
+    glicko_brp_gb = glicko_brp_gb.reset_index()
 
-glicko_brp_count = glicko_brp_df.groupby(['Rnds_Played']).count()
-glicko_brp_count = glicko_brp_count.reset_index()
+    glicko_brp_count = glicko_brp_df.groupby(['Rnds_Played']).count()
+    glicko_brp_count = glicko_brp_count.reset_index()
 
-# l5_brp_df = pd.DataFrame(l5_brp,columns=['Rnds_Played', 'Error'])
-# l5_brp_gb = l5_brp_df.groupby(['Rnds_Played']).mean()
-# l5_brp_gb = l5_brp_gb.reset_index()
+    # l5_brp_df = pd.DataFrame(l5_brp,columns=['Rnds_Played', 'Error'])
+    # l5_brp_gb = l5_brp_df.groupby(['Rnds_Played']).mean()
+    # l5_brp_gb = l5_brp_gb.reset_index()
 
-# groupby data to csv
-elo_brp_gb.to_csv('./data/rbr/elo_brp.csv',index='False')
-glicko_brp_gb.to_csv('./data/rbr/glicko_brp.csv',index='False')
-# l5_brp_gb.to_csv('./data/rbr/l5_brp.csv',index='False')
+    # groupby data to csv
+    elo_brp_gb.to_csv('./data/rbr/elo_brp.csv',index='False')
+    glicko_brp_gb.to_csv('./data/rbr/glicko_brp.csv',index='False')
+    # l5_brp_gb.to_csv('./data/rbr/l5_brp.csv',index='False')
 
-elo_brp_count.to_csv('./data/rbr/elo_brp_count.csv',index='False')
-glicko_brp_count.to_csv('./data/rbr/glicko_brp_count.csv',index='False')
+    elo_brp_count.to_csv('./data/rbr/elo_brp_count.csv',index='False')
+    glicko_brp_count.to_csv('./data/rbr/glicko_brp_count.csv',index='False')
 
 # print('TOTAL R1 ELO LOSS', str(np.round(sum(all_r1e_errors)/len(all_r1e_errors),5)))
 # print('TOTAL R2 ELO LOSS', str(np.round(sum(all_r2e_errors)/len(all_r2e_errors),5)))

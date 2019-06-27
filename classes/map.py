@@ -67,9 +67,7 @@ class Map(object):
         loc_df = pd.read_csv(self.locs_path)
         print(loc_df.head())
         loc_df = loc_df.set_index('Location')
-        loc_dict = loc_df.to_dict('index')
-        print(loc_dict)
-        return
+        return loc_df.to_dict('index')
 
     def check_skip(self,trn):
         skip = False
@@ -131,8 +129,6 @@ class Map(object):
 
 
         return
-
-map = Map()
 
 
 

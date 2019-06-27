@@ -17,7 +17,9 @@ class Player(object):
         gsig = glicko_set['sigma'],
         ldate = None,
         cdate = None,
-        lloc = None,
+        llat = None,
+        llng = None,
+        pr4 = False,
         cloc = None,
         R1=None,
         R2=None,
@@ -43,7 +45,9 @@ class Player(object):
         self.gsig = gsig
         self.ldate = ldate
         self.cdate = cdate
-        self.lloc = lloc
+        self.llat = llat
+        self.llng = llng
+        self.pr4=pr4
         self.cloc = cloc
         self.R1 = R1
         self.R2 = R2
@@ -55,6 +59,8 @@ class Player(object):
         self.matches=matches
         self.wl=wl
         self.days_since = self.days_since_last()
+        self.dist_from_last = None
+        self.bearing_from_last = None
 
     def add_win(self):
         self.wins+=1

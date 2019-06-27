@@ -13,17 +13,17 @@ from elo import Elo
 MU = glicko_set['init']
 ratio = glicko_set['ratio']
 
-travs = pd.read_csv('./data/travelersfield.csv')
+df = pd.read_csv('./data/rocketmortgage.csv')
 pr = pd.read_csv('./data/current_player_ratings.csv')
 
-field = list(travs.Name.unique())
-field.append('Bryson DeChambeau')
+field = list(df.Name.unique())
+
+for p in field:
+    if 'Moore' in p:
+        print(p)
+
 # field player ratings
 fpr = pr.loc[pr['name'].isin(field)]
-
-print(fpr)
-
-raise ValueError()
 
 def get_expected(pairs):
     global Elo
@@ -35,8 +35,12 @@ def get_expected(pairs):
     if p2_name=='Charlie Hoffman':
         p2_name = 'Charley Hoffman'
 
+    print(p1_name)
     p1_row = fpr.loc[pr['name']==p1_name]
+
+    print(p2_name)
     p2_row = fpr.loc[pr['name']==p2_name]
+
 
     p1_elo = p1_row['ielo'].values[0]
     p2_elo = p2_row['ielo'].values[0]
@@ -52,23 +56,33 @@ def get_expected(pairs):
     return row
 
 pairs = [
-['Ryan Moore','Byeong Hun An'],
-['C.T. Pan','Brian Harman'],
-['Brandt Snedeker','Patrick Reed'],
-['Francesco Molinari','Justin Thomas'],
-['Brooks Koepka','Patrick Cantlay'],
-['Tony Finau','Bubba Watson'],
-['Viktor Hovland','Charlie Hoffman'],
-['Viktor Hovland','Daniel Berger'],
-['Russell Knox','Phil Mickelson'],
-['Bryson DeChambeau','Tommy Fleetwood'],
-['Daniel Berger','Adam Hadwin'],
-['Kevin Kisner','Keegan Bradley'],
-['Jason Day','Paul Casey'],
-['Jordan Spieth','Marc Leishman'],
-['Kevin Streelman','Louis Oosthuizen'],
-['Bubba Watson', 'Brooks Koepka'],
-['Matthew Wolff','Kevin Tway']
+['Dustin Johnson','Gary Woodland'],
+['Charles Howell III','Kyle Stanley'],
+['Rickie Fowler','Hideki Matsuyama'],
+['Bubba Watson','Luke List'],
+['Brandt Snedeker','Chez Reavie'],
+['Aaron Wise','Joaquin Niemann'],
+['Rory Sabbatini','Ryan Moore'],
+['Billy Horschel','Kevin Kisner'],
+['Beau Hossler','Harold Varner III'],
+['Sungjae Im','Patrick Reed'],
+['Jason Kokrak','Byeong Hun An'],
+['Kevin Tway','Jimmy Walker']
+# ['Brian Harman','Sung Kang'],
+# ['Gary Woodland','Brandt Snedeker'],
+# ['Kevin Tway','Jimmy Walker'],
+# ['Dustin Johnson','Chez Reavie'],
+# ['Jonas Blixt','Ryan Armour'],
+# ['Corey Conners','Austin Cook'],
+# ['Cameron Champ', 'J.B. Holmes'],
+# ['Aaron Wise', 'Cameron Smith'],
+# ['Hideki Matsuyama', 'Billy Horschel'],
+# ['Rickie Fowler','Kevin Kisner'],
+# ['Kyle Stanley','Brendan Steele'],
+# ['J.J. Spaun', 'Michael Thompson'],
+# ['Danny Lee','Harold Varner III'],
+# ['Sungjae Im', 'Byeong Hun An'],
+# ['Ryan Moore', 'Cameron Tringale']
 ]
 
 Elo = Elo()
@@ -97,6 +111,6 @@ def pct_to_odds(x):
 mdf['Line P1'] = mdf['Model'].apply(lambda x: pct_to_odds(x))
 mdf['Line P2'] = mdf['Model'].apply(lambda x: pct_to_odds(1-x))
 
-print(mdf)
-# print(mdf[['Player 1', 'Player 2', 'Model', 'Line P1', 'Line P2']])
+# print(mdf)
+print(mdf[['Player 1', 'Player 2', 'Model', 'Line P1', 'Line P2']])
 # end

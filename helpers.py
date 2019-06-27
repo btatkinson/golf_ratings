@@ -7,6 +7,7 @@ from settings import *
 max_gvar = glicko_set['phi']
 # uncertainty increase
 u_i = glicko_set['u_i']
+bearings = ["NE", "E", "SE", "S", "SW", "W", "NW", "N"];
 
 def cross_entropy(yHat, y):
     delta = .00015
@@ -33,6 +34,38 @@ def add_uncertainty(gvar, days_since):
     # convert days to units of two weeks
     time_passed = days_since/14
     return min(math.sqrt((gvar**2)+(time_passed * (u_i **2))),max_gvar)
+
+def get_distance(lat1, lng1, lat2, lng2):
+    p = 0.017453292519943295 # Pi/180
+    a = 0.5 - np.cos((lat2 - lat1) * p)/2 + np.cos(lat1 * p) * np.cos(lat2 * p) * (1 - np.cos((lng2 - lng1) * p)) / 2
+    return 0.6213712 * 12745.6 * np.arcsin(np.sqrt(a))
+
+def get_direction(lat1,lng1,lat2,lng2):
+    lat1 = math.radians(lat1)
+    lat2 = math.radians(lat2)
+    lng1 = math.radians(lng1)
+    lng2 = math.radians(lng2)
+    dLng = lng2 - lng1
+
+    dPhi = math.log(math.tan(lat2/2.0+math.pi/4.0)/math.tan(lat1/2.0+math.pi/4.0))
+    if abs(dLng) > math.pi:
+         if dLng > 0.0:
+             dLng = -(2.0 * math.pi - dLng)
+         else:
+             dLng = (2.0 * math.pi + dLng)
+
+    return (math.degrees(math.atan2(dLng, dPhi)) + 360.0) % 360.0;
+
+def get_cardinal(dir):
+    index = dir - 22.5
+    if index < 0:
+        index += 360
+    intdex = int(np.round(index/45,0))
+    try:
+        card = bearings[intdex]
+    except:
+        card = "Other"
+    return card
 
 name_dict = {
     'III Davis Love':'Davis Love III',

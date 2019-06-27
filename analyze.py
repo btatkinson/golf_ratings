@@ -2,9 +2,69 @@ import numpy as np
 import pandas as pd
 from numpy.polynomial.polynomial import polyfit
 import matplotlib.pyplot as plt
+import scipy
 import seaborn as sns
 import math
 import gc
+
+######### Elo vs SG ###############
+
+df = pd.read_csv('./data/elo_vs_sg.csv')
+
+# Dropping more than a week long off
+print(len(df))
+df = df.dropna(subset=['Dist_From_Last'])
+# df = df.loc[df['Days_Since']>=14]
+df = df.loc[df['Days_Since']<=7]
+print(len(df))
+
+# Drop non round 1 values
+df = df.loc[df['Round']=='R1']
+# print(len(df))
+
+# Direction of travel
+east = ['NE','E','SE']
+west = ['NW','W','SW']
+vert = ['N','S']
+
+print("Before direction",len(df))
+df = df.loc[df['Bearing_From_Last'].isin(east)]
+print(len(df))
+
+df = df.loc[df['PR4']==True]
+
+# Drop close tournaments
+# df = df.loc[df['Dist_From_Last']>=1000]
+# plt.hist(df.Days_Since)
+# plt.show()
+
+# plt.show()
+
+
+df['Exp_SG'] = 0.01597693700746137*df['Elo_Gained'] - 1.3895877906647774e-05
+df['Diff'] = df['Strokes_Gained']-df['Exp_SG']
+
+fig, ax = plt.subplots(figsize=(15,7))
+
+x = df.Dist_From_Last.values[500:]
+y = df.Diff.values[500:]
+
+b, m = polyfit(x, y, 1)
+
+plt.scatter(x, y)
+
+line_y = []
+for _x in x:
+    line_y.append(_x * m + b)
+
+slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
+print("slope: ", slope)
+print("y int", intercept)
+print("r value", r_value)
+print("p value", p_value)
+print("std error", std_err)
+plt.plot(x, line_y, 'r-', label=None)
+plt.show()
 
 ######## Correlation of ranking systems ##################
 

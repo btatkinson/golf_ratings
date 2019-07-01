@@ -2,6 +2,15 @@ euro_init = {
     'elo':1455,
     'glicko':1455,
 }
+
+asg_set = {
+    'alpha':.03,
+    'max_window_len':200,
+    'min_ewm':100,
+    'pga': -0.1,
+    'euro':-0.75,
+}
+
 ielo_set = {
     'init':1500,
     'K':0.225,
@@ -9,7 +18,6 @@ ielo_set = {
     'ACP':0.006,
     'C':3.55
 }
-
 
 glicko_set = {
     'init':1500,

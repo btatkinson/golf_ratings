@@ -23,7 +23,6 @@ from elo import Elo
 from map import Map
 
 gc.collect()
-CALC_LOG_5=False
 BRP = False
 
 def get_tournament_leaderboard(row):
@@ -36,7 +35,7 @@ def get_tournament_leaderboard(row):
     tournament_leaderboard_path = '../golf_scraper/leaderboards/'+season+'/'+tour+'/'+name+'.csv'
     return pd.read_csv(tournament_leaderboard_path)
 
-player_database = pd.DataFrame(columns=['name','ielo','num_played','glicko','gvar','last_date','last_loc'])
+player_database = pd.DataFrame(columns=['name','asg','ielo','num_played','glicko','gvar','last_date','last_loc'])
 
 # load player_database
 player_database_path = './data/players.csv'
@@ -65,10 +64,10 @@ del cdf
 gc.collect()
 
 # iterate tournaments
-START = 0
-END = 2000
-sdf = sdf[START:END]
-print(sdf.head())
+# START = 0
+# END = 2000
+# sdf = sdf[START:END]
+# print(sdf.head())
 
 # initialize ratings objects
 Glicko = Glicko()
@@ -77,9 +76,14 @@ Elo = Elo()
 # initialize Map
 Map = Map()
 
+# divide sg between people who have sample size and not
+# 0 means less than 100 rounds
+all_sg0_loss = []
+all_sg1_loss = []
+
 all_elo_loss = []
 all_glicko_loss = []
-all_l5_loss = []
+
 
 # elo & glicko by rounds played
 
@@ -122,8 +126,9 @@ all_l5_loss = []
 # glicko_brp = []
 # l5_brp = []
 
-elo_vs_sg = []
+asg_vs_sg = []
 
+sdf = sdf.reset_index()
 # iterate schedule
 for index, row in tqdm(sdf.iterrows()):
 
@@ -135,10 +140,10 @@ for index, row in tqdm(sdf.iterrows()):
     start_date = str(row['start_date'])
     ## for testing ##
     # # when to begin testing? ##
-    # begin_date = 'Jan 01 2019'
-    # dt_start = datetime.datetime.strptime(str(start_date), '%b %d %Y').date()
-    # if dt_start <= datetime.datetime.strptime(begin_date, '%b %d %Y').date():
-    #     continue
+    begin_date = 'Jan 01 2015'
+    dt_start = datetime.datetime.strptime(str(start_date), '%b %d %Y').date()
+    if dt_start <= datetime.datetime.strptime(begin_date, '%b %d %Y').date():
+        continue
 
     location = row['location']
     # since there is only one location not found, skip that tournament
@@ -149,12 +154,6 @@ for index, row in tqdm(sdf.iterrows()):
         trn_lat = Map.loc_dict[location]['Latitude']
         trn_lng = Map.loc_dict[location]['Longitude']
 
-    ##  test
-    # print(row['name'])
-    # bg_lat = 36.9685
-    # bg_lng = -86.4808
-    # dist = get_distance(trn_lat,trn_lng,bg_lat,bg_lng)
-    # print(dist)
     # load tournament leaderboard based on inferred path
     tlb = get_tournament_leaderboard(row)
 
@@ -164,12 +163,11 @@ for index, row in tqdm(sdf.iterrows()):
     plist = []
 
     # error tracking
+    tsg0_err = []
+    tsg1_err = []
+
     telo_err = []
     tglicko_err = []
-    tl5_err = []
-
-    # track round error
-    relo_errors = []
 
     # possible options to speed up here
     # could try subtracting sets, then multiple key lookup using pydash or itemgetter
@@ -195,18 +193,17 @@ for index, row in tqdm(sdf.iterrows()):
                 llat = dict['llat'],
                 llng = dict['llng'],
                 pr4 = dict['pr4'],
-                cloc = None,
                 R1 = r['R1'],
                 R2 = r['R2'],
                 R3 = r['R3'],
                 R4 = r['R4'],
-                wins=dict['wins'],
-                losses=dict['losses'],
-                ties=dict['ties'],
-                matches=dict['matches'],
-                wl=dict['wl']
+                asg = dict['asg'],
+                prev_sgs = dict['prev_sgs']
             )
-            PObj.dist_from_last = get_distance(PObj.llat, PObj.llng, trn_lat, trn_lng)
+            if PObj.days_since <=10:
+                PObj.dist_from_last = get_distance(PObj.llat, PObj.llng, trn_lat, trn_lng)
+            else:
+                PObj.dist_from_last = 0
             dir = get_direction(trn_lat,trn_lng,PObj.llat,PObj.llng)
             bearing = get_cardinal(dir)
             PObj.bearing_from_last = bearing
@@ -231,21 +228,44 @@ for index, row in tqdm(sdf.iterrows()):
 
     # find unique player combinations for elo calc
     for round in rounds:
+
+        # track field strength of the round
+        field_sg = []
+        # track all scores to determine SG
+        rnd_scores = []
+        # track distance travelled for map experiment
+        rnd_dists = []
         # throw out any player that doesn't have a round score
         # still keep them to update after tournament
         good_plist = []
         bad_plist = []
         for p in plist:
+            ###
             round_score = getattr(p, round)
             include = validate(round_score)
             if include:
                 p.rnds_played += 1
+                field_sg.append(p.asg)
+                rnd_scores.append(round_score)
                 good_plist.append(p)
+                rnd_dists.append(p.dist_from_last)
             else:
                 bad_plist.append(p)
+        try:
+            avg_dist = sum(rnd_dists)/len(rnd_dists)
+        except:
+            avg_dist = 0
 
+        # couple tournaments only have zeros for rounds and should be skipped
         if len(good_plist) <= 0:
             continue
+
+        # determine the field strength via average adjusted strokes gained
+        field_str = sum(field_sg)/len(field_sg)
+
+        # determine avg score for SG
+        avg_score = sum(rnd_scores)/len(rnd_scores)
+
         # add uncertainty if it's been awhile since they've played
         # if round == 'R1':
         #     for p in good_plist:
@@ -259,38 +279,28 @@ for index, row in tqdm(sdf.iterrows()):
         # track number of opponents for Elo K val
         num_opps = len(good_plist) - 1
 
-        ## elo / log5 calc ##
-
         # track elo changes for everyone
         change_dict = {}
 
-        ## also, tracking elo & strokes gained for map experiment ##
-        rnd_elos = []
-        rnd_scores = []
-        rnd_dists = []
-        for p in good_plist:
-            change_dict[p.name] = 0
-
-            rnd_elos.append(p.elo)
-            rnd_scores.append(getattr(p, round))
-            rnd_dists.append(p.dist_from_last)
-
-        avg_elo = sum(rnd_elos)/len(rnd_elos)
-        avg_score = sum(rnd_scores)/len(rnd_scores)
-        try:
-            avg_dist = sum(rnd_dists)/len(rnd_dists)
-        except:
-            avg_dist = 0
-
         for p in good_plist:
             rnd_score = getattr(p, round)
-            SG = -1 * (rnd_score - avg_score)
-            EG = p.elo - avg_elo
+            SG = -1 * (rnd_score - avg_score) + field_str
+            p.prev_sgs = np.append(p.prev_sgs,SG)
+            ASG = p.asg
+            sg_err = rmse(ASG,SG)
+            if p.rnds_played >= 100:
+                tsg1_err.append(sg_err)
+            else:
+                tsg0_err.append(sg_err)
+            # calculate new asg
+            temp = p.calc_new_asg()
+            # print(index,round,p.name,ASG,SG,p.asg,len(p.prev_sgs))
+            change_dict[p.name] = 0
             try:
                 DG = avg_dist - p.dist_from_last
             except:
                 DG = 0
-            elo_vs_sg.append([EG,SG,DG,round,p.days_since,p.dist_from_last,p.bearing_from_last,p.pr4])
+            asg_vs_sg.append([ASG,SG,DG,round,p.days_since,p.dist_from_last,p.bearing_from_last,p.pr4,p.rnds_played])
 
         for combo in combos:
             p1 = combo[0]
@@ -299,15 +309,6 @@ for index, row in tqdm(sdf.iterrows()):
             p2_score = getattr(p2, round)
             margin = abs(p2_score - p1_score)
             if p1_score <= p2_score:
-                # player 1 is winner/draw
-                if CALC_LOG_5:
-                    log5_x = l5_x(p1.wl,p2.wl)
-                if p1_score == p2_score:
-                    p1.add_tie()
-                    p2.add_tie()
-                else:
-                    p1.add_win()
-                    p2.add_loss()
                 expected_result = Elo.x(p1.elo, p2.elo)
                 p1_change, p2_change = Elo.get_ielo_delta(expected_result, margin, p1, p2, num_opps, round)
                 # used for error tracking
@@ -317,11 +318,6 @@ for index, row in tqdm(sdf.iterrows()):
                 else:
                     result = 1
             else:
-                # player 2 is winner
-                if CALC_LOG_5:
-                    log5_x = l5_x(p1.wl,p2.wl)
-                p2.add_win()
-                p1.add_loss()
                 # order of arguments matters
                 expected_result = Elo.x(p2.elo, p1.elo)
                 p2_change, p1_change = Elo.get_ielo_delta(expected_result, margin, p2, p1, num_opps, round)
@@ -343,27 +339,12 @@ for index, row in tqdm(sdf.iterrows()):
             # if round == 'R4':
             #     all_r4e_errors.append(elo_error)
 
-            if CALC_LOG_5:
-                l5_error = cross_entropy(log5_x, result)
-                if BRP:
-                    l5_brp.append([p1.rnds_played, l5_error])
-                    l5_brp.append([p2.rnds_played, l5_error])
-                tl5_err.append(l5_error)
-
             change_dict[p1.name] += p1_change
             change_dict[p2.name] += p2_change
 
         # apply changes to player elo & log_5 after round
         for p in good_plist:
             p.elo += change_dict[p.name]
-            if round == 'R4':
-                p.pr4 = True
-            else:
-                p.pr4 = False
-
-        if CALC_LOG_5:
-            for p in good_plist:
-                p.calc_win_loss()
 
         ## Glicko Calc ##
 
@@ -414,18 +395,26 @@ for index, row in tqdm(sdf.iterrows()):
         # get stats into dict format
         p.llat = trn_lat
         p.llng = trn_lng
-        stats = {'ielo': p.elo, 'rnds_played': p.rnds_played, 'glicko': p.glicko, 'gvar': p.gvar, 'gsig':p.gsig, 'last_date': start_date, 'llat': p.llat,
-        'llng': p.llng, 'pr4':p.pr4, 'wins':p.wins,'losses':p.losses,'ties':p.ties,'matches':p.matches,'wl':p.wl}
+        ## track if they played round 4 ##
+        try:
+            r4_score = int(getattr(p, 'R4'))
+            p.pr4 = validate(r4_score)
+        except:
+            p.pr4 = False
+        stats = {'asg':p.asg, 'prev_sgs':p.prev_sgs, 'ielo': p.elo, 'rnds_played': p.rnds_played, 'glicko': p.glicko, 'gvar': p.gvar, 'gsig':p.gsig, 'last_date': start_date, 'llat': p.llat,
+        'llng': p.llng, 'pr4':p.pr4}
         pdf[p.name] = stats
     # calculate error
+    if len(tsg0_err) > 0:
+        tournament_sg0_loss = np.round(sum(tsg0_err)/len(tsg0_err),5)
+        all_sg0_loss.append(tournament_sg0_loss)
+    if len(tsg1_err) > 0:
+        tournament_sg1_loss = np.round(sum(tsg1_err)/len(tsg1_err),5)
+        all_sg1_loss.append(tournament_sg1_loss)
     tournament_elo_loss = np.round(sum(telo_err)/len(telo_err),5)
     tournament_glicko_loss = np.round(sum(tglicko_err)/len(tglicko_err),5)
     all_elo_loss.append(tournament_elo_loss)
     all_glicko_loss.append(tournament_glicko_loss)
-
-    if CALC_LOG_5:
-        tournament_l5_loss = np.round(sum(tl5_err)/len(tl5_err),5)
-        all_l5_loss.append(tournament_l5_loss)
 
     # season_errors['errors'][str(season)][row['tour']]['elo'] += tournament_elo_loss
     #
@@ -440,29 +429,26 @@ for index, row in tqdm(sdf.iterrows()):
     # season_errors['counts'][str(season)][row['tour']]['l5'] += 1
 
 
-comparison = pd.DataFrame(elo_vs_sg, columns=['Elo_Gained','Strokes_Gained','Distance Gained', 'Round','Days_Since','Dist_From_Last','Bearing_From_Last','PR4'])
-comparison.to_csv('./data/elo_vs_sg.csv',index=False)
+comparison = pd.DataFrame(asg_vs_sg, columns=['ASG','Strokes_Gained','Distance Gained', 'Round','Days_Since','Dist_From_Last','Bearing_From_Last','PR4','Rnds_Played'])
+comparison.to_csv('./data/asg_vs_sg.csv',index=False)
 
-raise ValueError('Done Testing')
 player_ratings = pd.DataFrame.from_dict(pdf, orient='index')
 player_ratings.index.name=('name')
 player_ratings = player_ratings.reset_index('name')
+player_ratings = player_ratings.loc[player_ratings['rnds_played']>100]
 player_ratings = player_ratings.sort_values(by='glicko',ascending=False)
 print(player_ratings.head(50))
 player_ratings = player_ratings.sort_values(by='ielo',ascending=False)
 print(player_ratings.head(50))
+player_ratings = player_ratings.sort_values(by='asg',ascending=False)
+print(player_ratings.head(50))
 
 player_ratings.to_csv('./data/current_player_ratings.csv',index=False)
 
+print('TOTAL AVERAGE ASG0 LOSS', str(np.round(sum(all_sg0_loss)/len(all_sg0_loss),5)))
+print('TOTAL AVERAGE ASG1 LOSS', str(np.round(sum(all_sg1_loss)/len(all_sg1_loss),5)))
 print('TOTAL AVERAGE ELO LOSS', str(np.round(sum(all_elo_loss)/len(all_elo_loss),5)))
 print('TOTAL AVERAGE GLICKO LOSS', str(np.round(sum(all_glicko_loss)/len(all_glicko_loss),5)))
-if CALC_LOG_5:
-    print('TOTAL AVERAGE LOG5 LOSS', str(np.round(sum(all_l5_loss)/len(all_l5_loss),5)))
-    if BRP:
-        l5_brp_df = pd.DataFrame(l5_brp,columns=['Rnds_Played', 'Error'])
-        l5_brp_gb = l5_brp_df.groupby(['Rnds_Played']).count()
-        l5_brp_gb = l5_brp_gb.reset_index()
-        l5_brp_gb.to_csv('./data/rbr/log_5_counts.csv',index='False')
 
 if BRP:
     elo_brp_df = pd.DataFrame(elo_brp,columns=['Rnds_Played', 'Error'])

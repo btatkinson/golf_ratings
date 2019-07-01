@@ -3,6 +3,11 @@ import datetime
 
 sys.path.insert(0, '../')
 from settings import *
+from helpers import *
+
+ALPHA = asg_set['alpha']
+MWL = asg_set['max_window_len']
+MEWM = asg_set['min_ewm']
 
 class Player(object):
     """docstring for Player."""
@@ -10,6 +15,7 @@ class Player(object):
     def __init__(self,
         name=None,
         tour='PGA',
+        asg=0,
         elo=ielo_set['init'],
         rnds_played = 0,
         glicko = glicko_set['init'],
@@ -20,20 +26,18 @@ class Player(object):
         llat = None,
         llng = None,
         pr4 = False,
-        cloc = None,
         R1=None,
         R2=None,
         R3=None,
         R4=None,
-        wins=int(0),
-        losses=int(0),
-        ties=int(0),
-        matches=0,
-        wl=float(0.5)
+        prev_sgs = np.array([]),
+        dist_from_last=0,
+        bearing_from_last=0
         ):
 
         super(Player, self).__init__()
         self.name = name
+        self.asg = asg
         if tour == 'PGA':
             self.elo = elo
             self.glicko = glicko
@@ -48,41 +52,25 @@ class Player(object):
         self.llat = llat
         self.llng = llng
         self.pr4=pr4
-        self.cloc = cloc
         self.R1 = R1
         self.R2 = R2
         self.R3 = R3
         self.R4 = R4
-        self.wins=wins
-        self.losses=losses
-        self.ties=ties
-        self.matches=matches
-        self.wl=wl
+        self.prev_sgs = prev_sgs
         self.days_since = self.days_since_last()
-        self.dist_from_last = None
-        self.bearing_from_last = None
+        self.dist_from_last = dist_from_last
+        self.bearing_from_last = bearing_from_last
 
-    def add_win(self):
-        self.wins+=1
-        self.matches+=1
-        return
-
-    def add_loss(self):
-        self.losses+=1
-        self.matches+=1
-        return
-
-    def add_tie(self):
-        self.ties+=1
-        self.matches+=1
-        return
-
-    def calc_win_loss(self):
-        if self.rnds_played <= 1:
-            self.wl = 0.5
+    def calc_new_asg(self):
+        temp = None
+        if len(self.prev_sgs) > MWL:
+            self.prev_sgs = np.delete(self.prev_sgs, 0)
+        if len(self.prev_sgs) >= MEWM:
+            ewm = ewma_vectorized(self.prev_sgs,ALPHA)
+            self.asg = ewm[-1]
         else:
-            self.wl = (self.wins + 0.5*self.ties)/self.matches
-        return
+            self.asg=sum(self.prev_sgs)/len(self.prev_sgs)
+        return temp
 
     def days_since_last(self):
         dsl = 365

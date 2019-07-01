@@ -56,7 +56,7 @@ from map import Map
 #
 # raise ValueError('Done Plotting')
 
-######### Elo vs SG ###############
+######### ASG vs SG ###############
 
 # Direction of travel
 east = ['NE','E','SE']
@@ -67,27 +67,29 @@ vert = ['N','S']
 def osw(row):
     on_short_week = False
     if (row['Days_Since'] <= 8
-    and row['PR4']==True
-    # and row['Bearing_From_Last'] in east
-    and row['Dist_From_Last'] > 1000
-    and row['Round'] in ['R1']):
+    and row['PR4']==True):
+    # and row['Bearing_From_Last'] in east):
+    # and row['Dist_From_Last'] > 1000
+    # and row['Round'] in ['R1']):
         on_short_week = True
     return on_short_week
 
-df = pd.read_csv('./data/elo_vs_sg.csv')
+df = pd.read_csv('./data/asg_vs_sg.csv')
 
 print("Before dropping results from golfers with low rounds played", len(df))
-# df = df.loc[df['Rnds_Played']>=40]
+df = df.loc[df['Rnds_Played']>=50]
 print(len(df))
 
-df['Exp_SG'] = 0.01485372967616837*df['Elo_Gained']
+# ys = df.Strokes_Gained.values
+# _ys = stats.yeojohnson(ys)
+# _ys = list(_ys[0])
+# df.Strokes_Gained = pd.Series(_ys)
+
+df['Exp_SG'] = 0.8929320858001151*df['ASG'] + 0.1939090357919363
 df['Diff'] = df['Strokes_Gained']-df['Exp_SG']
 
-# create mask for on short week
-# df['OSW'] = df.apply(lambda row: osw(row),axis=1)
+df['Diff'] = df['Diff'] + (0.0007545274595516816 * df['Days_Since']) + 0.14612198113764147
 #
-# osw = df.loc[df['OSW']==True]
-# nosw = df.loc[df['OSW']==False]
 #
 # print(len(osw),osw.Diff.mean(),osw.Diff.std())
 # print(len(nosw),nosw.Diff.mean(),nosw.Diff.std())
@@ -97,17 +99,22 @@ df['Diff'] = df['Strokes_Gained']-df['Exp_SG']
 
 df = df.dropna(subset=['Dist_From_Last'])
 # Dropping more than a week long off
-print("Before narrowing time",len(df))
-# df = df.loc[df['Days_Since']<=8]
-# df = df.loc[df['Days_Since']>=6]
-print(len(df))
 #
-# # Did they play in round 4 of the previous tournament?
-# print('Before PR4', len(df))
-np4df = df.loc[df['PR4']==False]
-df = df.loc[df['PR4']==True]
 
-# print(len(df))
+# create mask for on short week
+df['OSW'] = df.apply(lambda row: osw(row),axis=1)
+#
+
+# df = df.loc[df['Round'].isin(['R1'])]
+np4df = df.loc[df['OSW']==False]
+df = df.loc[df['OSW']==True]
+
+df.Diff = df.Diff.apply(lambda x: x - 0.177)
+
+print(np4df.Diff.mean())
+print(df.Diff.mean())
+print(len(np4df))
+print(len(df))
 #
 # print("Before direction",len(df))
 # # df = df.loc[df['Bearing_From_Last'].isin(east)]
@@ -115,7 +122,6 @@ df = df.loc[df['PR4']==True]
 #
 # # Drop non round 1 values
 # print('Before Narrowing Rounds',len(df))
-df = df.loc[df['Round'].isin(['R1'])]
 # print(len(df))
 
 # Drop close tournaments
@@ -127,21 +133,12 @@ df = df.loc[df['Round'].isin(['R1'])]
 
 fig, ax = plt.subplots(figsize=(15,7))
 
-np4x = np4df['Distance Gained'].values
-np4y = np4df.Exp_SG.values
+np4x = np4df.Days_Since.values
+np4y = np4df.Diff.values
 
 x = df['Distance Gained'].values
-y = df.Exp_SG.values
+y = df.Diff.values
 
-# new_xs = []
-# for _x in x:
-#     new_x = math.log10(_x+1)
-#     new_xs.append(new_x)
-#
-# x = new_xs
-#
-# print(np.percentile(x, 1))
-# print(np.percentile(y, 95))
 
 # # result in no skew and kurtosis 3
 # epsilon = -0.031
@@ -163,24 +160,20 @@ y = df.Exp_SG.values
 # _x = list(_x[0])
 # x = _x
 
-# _y = stats.yeojohnson(y)
-# _y = list(_y[0])
-# y = _y
-
 # log past 12
 # new_ys = []
 # for _y in y:
 #     if _y < -9.5:
-#         new_y = - 9.5 - 3.25*math.log10((-1*_y)-9.5)
+#         new_y = - 9.5 - 2.5*math.log10((-1*_y)-9.5)
 #     else:
 #         new_y = _y
 #     new_ys.append(new_y)
-#
+# #
 # y = new_ys
 
-# print("Normal Test")
-# print(stats.normaltest(x))
-# print(stats.normaltest(y))
+print("Normal Test")
+print(stats.normaltest(x))
+print(stats.normaltest(y))
 #
 # print("Kurtosis")
 # print(stats.kurtosis(x))
@@ -190,6 +183,8 @@ y = df.Exp_SG.values
 # print(stats.skew(x))
 # print(stats.skew(y))
 #
+
+print("IS ON SHORT WEEK")
 slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
 print("slope: ", slope)
 print("y int", intercept)
@@ -201,27 +196,29 @@ line_y = []
 for _x in x:
     line_y.append(slope * _x + intercept)
 
-slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(np4x,np4y)
-print("slope: ", slope)
-print("y int", intercept)
-print("r value", r_value)
-print("p value", p_value)
-print("std error", std_err)
+# print("IS NOT ON SHORT WEEK")
+# slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(np4x,np4y)
+# print("slope: ", slope)
+# print("y int", intercept)
+# print("r value", r_value)
+# print("p value", p_value)
+# print("std error", std_err)
 
-line_np4y = []
-for _x in np4x:
-    line_np4y.append(slope * _x + intercept)
-plt.scatter(np4x,np4y,s=3)
-plt.plot(np4x, line_np4y, label="Did Not Play R4")
+# line_np4y = []
+# for _x in np4x:
+#     line_np4y.append(slope * _x + intercept)
+# plt.scatter(np4x,np4y,s=3)
+# plt.plot(np4x, line_np4y, label="Did Not Play R4")
 plt.scatter(x,y,s=3)
-plt.plot(x, line_y, '-r', label="Did Play")
+plt.plot(x, line_y, '-r', label="On Short Week")
 
 
 # stats.probplot(y, plot=plt)
-plt.xlabel("Distance From Last Tournament (Miles)")
-plt.ylabel("Strokes Gained Difference")
-plt.legend(loc='upper left')
-# plt.title('Q-Q Plot of Strokes Gained')
+plt.xlabel("Distance Gained On Field")
+plt.ylabel("Difference From Expected SG")
+# plt.legend(loc='upper left')
+plt.title('Distance Travelled Vs. Performance')
+# plt.title('Q-Q Plot After Transform')
 
 plt.show()
 

@@ -15,7 +15,7 @@ class Player(object):
     def __init__(self,
         name=None,
         tour='PGA',
-        asg=0,
+        asg=-2,
         elo=ielo_set['init'],
         rnds_played = 0,
         glicko = glicko_set['init'],
@@ -30,7 +30,7 @@ class Player(object):
         R2=None,
         R3=None,
         R4=None,
-        prev_sgs = np.array([]),
+        prev_sgs = np.full(asg_set['init_len'],asg_set['pga']),
         dist_from_last=0,
         bearing_from_last=0
         ):
@@ -38,19 +38,13 @@ class Player(object):
         super(Player, self).__init__()
         self.name = name
         self.asg = asg
-        if tour == 'PGA':
-            self.elo = elo
-            self.glicko = glicko
-        else:
-            self.elo = euro_init['elo']
-            self.glicko = euro_init['glicko']
+        self.elo = elo
+        self.glicko = glicko
         self.rnds_played = rnds_played
         self.gvar = gvar
         self.gsig = gsig
         self.ldate = ldate
         self.cdate = cdate
-        self.llat = llat
-        self.llng = llng
         self.pr4=pr4
         self.R1 = R1
         self.R2 = R2
@@ -65,11 +59,13 @@ class Player(object):
         temp = None
         if len(self.prev_sgs) > MWL:
             self.prev_sgs = np.delete(self.prev_sgs, 0)
+
+        ewm = ewma_vectorized(self.prev_sgs,ALPHA)
+        asg = ewm[-1]
         if len(self.prev_sgs) >= MEWM:
-            ewm = ewma_vectorized(self.prev_sgs,ALPHA)
-            self.asg = ewm[-1]
+            self.asg = asg
         else:
-            self.asg=sum(self.prev_sgs)/len(self.prev_sgs)
+            self.asg= (asg + sum(self.prev_sgs)/len(self.prev_sgs))/2
         return temp
 
     def days_since_last(self):

@@ -7,8 +7,10 @@ asg_set = {
     'alpha':.03,
     'max_window_len':200,
     'min_ewm':100,
-    'pga': -0.1,
-    'euro':-0.75,
+    'init_len':15,
+    'pga': -1.5,
+    'euro':-1.65,
+    'web':-2
 }
 
 ielo_set = {

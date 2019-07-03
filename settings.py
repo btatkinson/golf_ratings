@@ -1,16 +1,21 @@
+import numpy as np
+
 euro_init = {
     'elo':1455,
     'glicko':1455,
 }
 
 asg_set = {
-    'alpha':.03,
+    'alpha':.025,
     'max_window_len':200,
     'min_ewm':100,
     'init_len':15,
-    'pga': -1.5,
-    'euro':-1.65,
-    'web':-2
+    'pvar_sms':9.043475601688755,
+    'pvar_lgs':8.347564763611148,
+    'pct_sms':1,
+    'pct_lgs':0.65,
+    'init_pga':np.array([]),
+    'init_euro':np.array([]),
 }
 
 ielo_set = {
@@ -23,13 +28,13 @@ ielo_set = {
 
 glicko_set = {
     'init':1500,
-    'phi':20.0,
-    'sigma':0.0285,
-    'tau':0.009,
+    'phi':8.5,
+    'sigma':0.002,
+    'tau':0.2,
     'epsilon':0.000001,
     'ratio':173.7178,
     # how fast does uncertainty increase?
-    'u_i':1.30
+    'u_i':1.5
 }
 
 

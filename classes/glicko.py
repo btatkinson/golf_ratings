@@ -70,6 +70,10 @@ class Glicko(object):
     def reduce_impact(self, RD):
         return 1 / math.sqrt(1 + (3 * RD ** 2) / (math.pi ** 2))
 
+    def x(self,p1,p2):
+        impact = self.reduce_impact(p2.gvar/ratio)
+        return self.get_expected((p1.glicko - MU)/ratio, (p2.glicko - MU)/ratio, impact)
+
     def update(self, player, opps):
 
         mu = (player.glicko - MU)/ratio
@@ -88,8 +92,6 @@ class Glicko(object):
 
             impact = self.reduce_impact(opp_phi)
             expected_result = self.get_expected(mu, opp_mu, impact)
-            match_error = cross_entropy(expected_result, result)
-            all_errors.append(match_error)
             var_inv += impact ** 2 * expected_result * (1 - expected_result)
             diff += impact * (result - expected_result)
             dsq_inv += (expected_result * (1 - expected_result) * (Q ** 2) * (impact ** 2))
@@ -109,9 +111,7 @@ class Glicko(object):
         player.gvar = phi * ratio
         player.gsig = sigma
 
-        error = sum(all_errors)/len(all_errors)
-
-        return player, error
+        return player
 
 
 # end

@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import sys
+import pickle
+import datetime
 
 from helpers import *
 from settings import *
@@ -13,21 +15,15 @@ from elo import Elo
 MU = glicko_set['init']
 ratio = glicko_set['ratio']
 
-df = pd.read_csv('./data/rocketmortgage.csv')
+df = pd.read_csv('./data/3M.csv')
 pr = pd.read_csv('./data/current_player_ratings.csv')
 
 field = list(df.Name.unique())
-
-for p in field:
-    if 'Moore' in p:
-        print(p)
 
 # field player ratings
 fpr = pr.loc[pr['name'].isin(field)]
 
 def get_expected(pairs):
-    global Elo
-    global Glicko
 
     p1_name = pairs[0]
     p2_name = pairs[1]
@@ -35,11 +31,11 @@ def get_expected(pairs):
     if p2_name=='Charlie Hoffman':
         p2_name = 'Charley Hoffman'
 
-    print(p1_name)
     p1_row = fpr.loc[pr['name']==p1_name]
+    print(p1_row)
 
-    print(p2_name)
     p2_row = fpr.loc[pr['name']==p2_name]
+    print(p2_row)
 
 
     p1_elo = p1_row['ielo'].values[0]
@@ -47,57 +43,54 @@ def get_expected(pairs):
 
     elo_expected = Elo.x(p1_elo,p2_elo)
 
-    impact = Glicko.reduce_impact(p2_row['gvar'].values[0])
+    impact = Glicko.reduce_impact(p2_row['gvar'])
     mu = (p1_row['glicko'].values[0] - MU)/ratio
     opp_mu = (p2_row['glicko'].values[0] - MU)/ratio
-    expected_result = Glicko.get_expected(mu, opp_mu, impact)
+    glicko_expected = Glicko.get_expected(mu, opp_mu, impact)
 
-    row = [p1_name, p2_name, elo_expected, expected_result]
+    p1_asg = p1_row['asg'].values[0]
+    p1_var = p1_row['pvar'].values[0]
+    p2_asg = p2_row['asg'].values[0]
+    p2_var = p2_row['pvar'].values[0]
+    sg_x = asg_pred(p1_asg,p1_var,p2_asg,p2_var)
+
+    p1_ldate = p1_row['last_date'].values[0]
+    p1_ldate = datetime.datetime.strptime(str(p1_ldate), '%b %d %Y').date()
+    current_date = datetime.datetime.strptime(str('Jul 4 2019'), '%b %d %Y').date()
+    p1_dsl = current_date - p1_ldate
+    p1_days = p1_dsl.days
+
+    p2_ldate = p2_row['last_date'].values[0]
+    p2_ldate = datetime.datetime.strptime(str(p2_ldate), '%b %d %Y').date()
+    p2_dsl = current_date - p2_ldate
+    p2_days = p2_dsl.days
+
+    p1_rnds_played = p1_row['rnds_played'].values[0]
+    p2_rnds_played = p2_row['rnds_played'].values[0]
+
+    row = [elo_expected, sg_x, glicko_expected, 2, p1_days,p1_rnds_played,p2_days,p2_rnds_played]
     return row
 
 pairs = [
-['Dustin Johnson','Gary Woodland'],
-['Charles Howell III','Kyle Stanley'],
-['Rickie Fowler','Hideki Matsuyama'],
-['Bubba Watson','Luke List'],
-['Brandt Snedeker','Chez Reavie'],
-['Aaron Wise','Joaquin Niemann'],
-['Rory Sabbatini','Ryan Moore'],
-['Billy Horschel','Kevin Kisner'],
-['Beau Hossler','Harold Varner III'],
-['Sungjae Im','Patrick Reed'],
-['Jason Kokrak','Byeong Hun An'],
-['Kevin Tway','Jimmy Walker']
-# ['Brian Harman','Sung Kang'],
-# ['Gary Woodland','Brandt Snedeker'],
-# ['Kevin Tway','Jimmy Walker'],
-# ['Dustin Johnson','Chez Reavie'],
-# ['Jonas Blixt','Ryan Armour'],
-# ['Corey Conners','Austin Cook'],
-# ['Cameron Champ', 'J.B. Holmes'],
-# ['Aaron Wise', 'Cameron Smith'],
-# ['Hideki Matsuyama', 'Billy Horschel'],
-# ['Rickie Fowler','Kevin Kisner'],
-# ['Kyle Stanley','Brendan Steele'],
-# ['J.J. Spaun', 'Michael Thompson'],
-# ['Danny Lee','Harold Varner III'],
-# ['Sungjae Im', 'Byeong Hun An'],
-# ['Ryan Moore', 'Cameron Tringale']
+['Charles Howell III','Joaquin Niemann'],
+['Viktor Hovland', 'Rory Sabbatini'],
+
 ]
 
 Elo = Elo()
 Glicko = Glicko()
+model = pickle.load(open('model.sav', 'rb'))
 
 all_expected = []
 for pair in pairs:
-    expected = get_expected(pair)
-    all_expected.append(expected)
+    expected = np.array(get_expected(pair))
+    prediction = model.predict_proba(expected.reshape(1,-1))[0][0]
+    print(prediction)
+    p1_name = pair[0]
+    p2_name = pair[1]
+    all_expected.append([p1_name,p2_name,prediction])
 
-mdf = pd.DataFrame(all_expected, columns=['Player 1', 'Player 2', 'Elo X', 'Glicko X'])
-
-mdf['Model'] = 0.35*mdf['Elo X'] + 0.65*mdf['Glicko X']
-mdf['Model'] = mdf['Model'].round(4)
-
+mdf = pd.DataFrame(all_expected, columns=['Player 1', 'Player 2','Model'])
 
 def pct_to_odds(x):
     x *= 100

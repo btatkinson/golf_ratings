@@ -1,5 +1,6 @@
 import sys
 import datetime
+import ast
 
 sys.path.insert(0, '../')
 from settings import *
@@ -9,6 +10,11 @@ ALPHA = asg_set['alpha']
 MWL = asg_set['max_window_len']
 MEWM = asg_set['min_ewm']
 
+pvar_sms = asg_set['pvar_sms']
+pvar_lgs = asg_set['pvar_lgs']
+pct_sms = asg_set['pct_sms']
+pct_lgs = asg_set['pct_lgs']
+
 class Player(object):
     """docstring for Player."""
 
@@ -16,6 +22,7 @@ class Player(object):
         name=None,
         tour='PGA',
         asg=-2,
+        pvar=asg_set['pvar_sms'],
         elo=ielo_set['init'],
         rnds_played = 0,
         glicko = glicko_set['init'],
@@ -23,21 +30,18 @@ class Player(object):
         gsig = glicko_set['sigma'],
         ldate = None,
         cdate = None,
-        llat = None,
-        llng = None,
         pr4 = False,
         R1=None,
         R2=None,
         R3=None,
         R4=None,
-        prev_sgs = np.full(asg_set['init_len'],asg_set['pga']),
-        dist_from_last=0,
-        bearing_from_last=0
+        prev_sgs = asg_set['init_pga']
         ):
 
         super(Player, self).__init__()
         self.name = name
         self.asg = asg
+        self.pvar = pvar
         self.elo = elo
         self.glicko = glicko
         self.rnds_played = rnds_played
@@ -52,11 +56,22 @@ class Player(object):
         self.R4 = R4
         self.prev_sgs = prev_sgs
         self.days_since = self.days_since_last()
-        self.dist_from_last = dist_from_last
-        self.bearing_from_last = bearing_from_last
+        self.calc_var()
+
+    def calc_var(self):
+        try:
+            self.prev_sgs = [float(i) for i in self.prev_sgs]
+        except:
+            self.prev_sgs = ast.literal_eval(self.prev_sgs)
+        if len(self.prev_sgs) <=0:
+            self.pvar = pvar_sms
+        elif self.rnds_played <= 100:
+            self.pvar = pvar_sms
+        else:
+            self.pvar = (pct_lgs * pvar_lgs) + (1-pct_lgs)* np.var(self.prev_sgs)
+        return
 
     def calc_new_asg(self):
-        temp = None
         if len(self.prev_sgs) > MWL:
             self.prev_sgs = np.delete(self.prev_sgs, 0)
 
@@ -65,8 +80,8 @@ class Player(object):
         if len(self.prev_sgs) >= MEWM:
             self.asg = asg
         else:
-            self.asg= (asg + sum(self.prev_sgs)/len(self.prev_sgs))/2
-        return temp
+            self.asg= sum(self.prev_sgs)/len(self.prev_sgs)
+        return
 
     def days_since_last(self):
         dsl = 365

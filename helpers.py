@@ -1,6 +1,8 @@
 import math
 import numpy as np
 import pandas as pd
+import scipy.stats
+# from statistics import NormalDist
 
 from settings import *
 
@@ -141,6 +143,16 @@ def window_size(alpha, sum_proportion):
     # Increases with increased sum_proportion and decreased alpha
     # solve (1-alpha)**window_size = (1-sum_proportion) for window_size
     return int(np.log(1-sum_proportion) / np.log(1-alpha))
+
+def asg_pred(p1m, p1v, p2m, p2v):
+    # too slow to use scipy
+    return scipy.stats.norm.cdf((p1m-p2m)/math.sqrt(p1v + p2v))
+    # return (p1m-p2m)/math.sqrt(p1v + p2v)
+
+def clean_ps(x):
+    x = x.tolist()
+    print(x)
+    return x
 
 name_dict = {
     'III Davis Love':'Davis Love III',

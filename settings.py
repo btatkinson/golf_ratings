@@ -6,7 +6,7 @@ euro_init = {
 }
 
 asg_set = {
-    'alpha':.025,
+    'alpha':.023, #0.25
     'max_window_len':200,
     'min_ewm':100,
     'init_len':15,
@@ -18,17 +18,22 @@ asg_set = {
     'init_euro':np.array([]),
 }
 
+# basic elo
+relo_set = {
+    'K':0.23 #0.25 - 0.29137
+}
+
 ielo_set = {
     'init':1500,
-    'K':0.225,
+    'K':0.2215, #0.221 & 0.2225 - 29.137
     'beta':400,
     'ACP':0.006,
-    'C':3.55
+    'C':3
 }
 
 glicko_set = {
     'init':1500,
-    'phi':8.5,
+    'phi':8.9, # 9 - 29.305, 8.75-29.306, < 8.75 is worse
     'sigma':0.002,
     'tau':0.2,
     'epsilon':0.000001,

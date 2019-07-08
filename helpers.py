@@ -27,7 +27,7 @@ def cross_entropy(yHat, y):
 def rmse(pred, actual):
     return math.sqrt((pred-actual)**2)
 
-def l5_x(pa, pb):
+def get_l5_x(pa, pb):
     if pa == pb:
         return 0.5
     denom = ((pa + pb) - (2 * pa * pb))

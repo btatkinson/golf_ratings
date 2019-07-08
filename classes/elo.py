@@ -11,6 +11,7 @@ class Elo(object):
 
     beta = ielo_set['beta']
     K = ielo_set['K']
+    rK = relo_set['K']
 
     ielo_acp = ielo_set['ACP']
     ielo_c = ielo_set['C']
@@ -23,8 +24,8 @@ class Elo(object):
         elo_diff = p1_elo - p2_elo
         return 1/(1 + math.pow(10,(-elo_diff / self.beta)))
 
-    def get_delta(self, prob):
-        return self.K * (1 - prob)
+    def get_delta(self, prob, tie):
+        return self.rK * (1 - prob) if not tie else self.rK * (0.5-prob)
 
     def get_movm(self, margin):
         return 0.48*np.log(max(abs(margin), 1) + 1.0)

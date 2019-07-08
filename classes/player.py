@@ -21,9 +21,10 @@ class Player(object):
     def __init__(self,
         name=None,
         tour='PGA',
-        asg=-2,
+        asg=0,
         pvar=asg_set['pvar_sms'],
         elo=ielo_set['init'],
+        relo=ielo_set['init'],
         rnds_played = 0,
         glicko = glicko_set['init'],
         gvar = glicko_set['phi'],
@@ -35,7 +36,12 @@ class Player(object):
         R2=None,
         R3=None,
         R4=None,
-        prev_sgs = asg_set['init_pga']
+        prev_sgs = asg_set['init_pga'],
+        wins=0,
+        losses=0,
+        ties=0,
+        matches=0,
+        wl=0.5
         ):
 
         super(Player, self).__init__()
@@ -43,6 +49,7 @@ class Player(object):
         self.asg = asg
         self.pvar = pvar
         self.elo = elo
+        self.relo = relo
         self.glicko = glicko
         self.rnds_played = rnds_played
         self.gvar = gvar
@@ -57,6 +64,28 @@ class Player(object):
         self.prev_sgs = prev_sgs
         self.days_since = self.days_since_last()
         self.calc_var()
+        self.wins=wins
+        self.losses=losses
+        self.ties=ties
+        self.matches=matches
+        self.wl = wl
+
+    def add_win(self):
+        self.wins+=1
+        self.matches+=1
+        return
+    def add_loss(self):
+        self.losses+=1
+        self.matches+=1
+        return
+    def add_tie(self):
+        self.ties+=1
+        self.matches+=1
+        return
+
+    def calc_wl(self):
+        self.wl = ((0.5*self.ties)+self.wins)/(self.matches)
+        return
 
     def calc_var(self):
         try:
@@ -80,7 +109,7 @@ class Player(object):
         if len(self.prev_sgs) >= MEWM:
             self.asg = asg
         else:
-            self.asg= sum(self.prev_sgs)/len(self.prev_sgs)
+            self.asg= (sum(self.prev_sgs)/len(self.prev_sgs) + asg)/2
         return
 
     def days_since_last(self):

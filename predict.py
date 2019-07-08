@@ -22,6 +22,8 @@ field = list(df.Name.unique())
 
 # field player ratings
 fpr = pr.loc[pr['name'].isin(field)]
+fpr = fpr.sort_values(by=['ielo'],ascending=False)
+print(fpr.head(100))
 
 def get_expected(pairs):
 
@@ -68,12 +70,67 @@ def get_expected(pairs):
     p1_rnds_played = p1_row['rnds_played'].values[0]
     p2_rnds_played = p2_row['rnds_played'].values[0]
 
-    row = [elo_expected, sg_x, glicko_expected, 2, p1_days,p1_rnds_played,p2_days,p2_rnds_played]
-    return row
+    # row = [elo_expected, sg_x, glicko_expected, 2, p1_days,p1_rnds_played,p2_days,p2_rnds_played]
+    # return row
+    return elo_expected
 
 pairs = [
-['Charles Howell III','Joaquin Niemann'],
-['Viktor Hovland', 'Rory Sabbatini'],
+['Brooks Koepka','Patrick Reed'],
+['Adam Long', 'Ryan Armour'],
+['Bryson DeChambeau','Ryan Armour'],
+['Bryson DeChambeau','Keegan Bradley'],
+['Jason Dufner', 'Cameron Champ'],
+['Scott Piercy','Andrew Landry'],
+['Sungjae Im','Bill Haas'],
+['Rory Sabbatini','Beau Hossler'],
+['Talor Gooch','Nick Taylor'],
+['Ryan Moore','Charley Hoffman'],
+['Brooks Koepka','Patrick Reed'],
+['Danny Lee','Bud Cauley'],
+['Tony Finau','Phil Mickelson'],
+['Jason Day','Hideki Matsuyama'],
+['Daniel Berger','Russell Henley'],
+['Pat Perez','Mackenzie Hughes'],
+['Brian Harman','Jimmy Walker'],
+['Adam Hadwin','Max Homa']
+# ['Charles Howell III','Joaquin Niemann'],
+# ['Hideki Matsuyama','Patrick Reed'],
+# ['Daniel Berger', 'Adam Hadwin'],
+# ['Viktor Hovland', 'Rory Sabbatini'],
+# ['Scott Piercy','Nick Watney'],
+# ['Collin Morikawa','Nate Lashley'],
+# ['Ryan Moore','Phil Mickelson'],
+# ['Jimmy Walker', 'Mackenzie Hughes'],
+# ['Sungjae Im','Kevin Streelman'],
+# ['Lucas Glover','Kyle Stanley'],
+# ['Bryson DeChambeau','Tony Finau'],
+# ['Jason Day', 'Brooks Koepka'],
+# ['Brooks Koepka','Hideki Matsuyama'],
+# ['Bryson DeChambeau', 'Jason Day'],
+# ['Joaquin Niemann','Phil Mickelson'],
+# ['Bryson DeChambeau','Patrick Reed'],
+# ['Keith Mitchell','J.J. Spaun'],
+# ['Kevin Na', 'Keegan Bradley'],
+# ['Lucas Glover','Charley Hoffman'],
+# ['Charles Howell III','Scott Piercy'],
+# ['Tony Finau','Patrick Reed']
+# ['Viktor Hovland', 'Rory Sabbatini'],
+# ['Patrick Reed', 'Joaquin Niemann'],
+# ['Jason Day', 'Hideki Matsuyama'],
+# ['Viktor Hovland', 'Keegan Bradley'],
+# ['Bryson DeChambeau', 'Joaquin Niemann'],
+# ['Adam Hadwin', 'Nate Lashley'],
+# ['Brooks Koepka', 'Jason Day'],
+# ['Rory Sabbatini','Sungjae Im'],
+# ['Jimmy Walker','Brian Harman'],
+# ['Cameron Champ','Sung Kang'],
+# ['Tony Finau','Viktor Hovland'],
+# ['Mackenzie Hughes','Martin Laird'],
+# ['Charley Hoffman','Lucas Glover'],
+# ['Danny Lee', 'Pat Perez'],
+# ['Peter Malnati','Nick Watney'],
+# ['Daniel Berger','Collin Morikawa'],
+# ['Ryan Moore','Phil Mickelson']
 
 ]
 
@@ -83,9 +140,10 @@ model = pickle.load(open('model.sav', 'rb'))
 
 all_expected = []
 for pair in pairs:
-    expected = np.array(get_expected(pair))
-    prediction = model.predict_proba(expected.reshape(1,-1))[0][0]
-    print(prediction)
+    # expected = np.array(get_expected(pair))
+    # prediction = model.predict_proba(expected.reshape(1,-1))[0][0]
+    # print(prediction)
+    prediction = get_expected(pair)
     p1_name = pair[0]
     p2_name = pair[1]
     all_expected.append([p1_name,p2_name,prediction])

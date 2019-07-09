@@ -94,10 +94,11 @@ class Player(object):
             self.prev_sgs = ast.literal_eval(self.prev_sgs)
         if len(self.prev_sgs) <=0:
             self.pvar = pvar_sms
-        elif self.rnds_played <= 100:
-            self.pvar = pvar_sms
+        # elif self.rnds_played <= 100:
+        #     self.pvar = pvar_sms
         else:
-            self.pvar = (pct_lgs * pvar_lgs) + (1-pct_lgs)* np.var(self.prev_sgs)
+            # self.pvar = (pct_lgs * pvar_lgs) + (1-pct_lgs)* np.var(self.prev_sgs)
+            self.pvar = np.var(self.prev_sgs)
         return
 
     def calc_new_asg(self):
@@ -110,14 +111,15 @@ class Player(object):
             self.asg = asg
         else:
             self.asg= (sum(self.prev_sgs)/len(self.prev_sgs) + asg)/2
+
         return
 
     def days_since_last(self):
-        dsl = 365
+        days = 0
         if self.ldate is None:
-            return None
+            return days
         elif self.cdate is None:
-            return None
+            return days
         else:
             last_date = datetime.datetime.strptime(str(self.ldate), '%b %d %Y').date()
             current_date = datetime.datetime.strptime(str(self.cdate), '%b %d %Y').date()

@@ -2,7 +2,7 @@ import numpy as np
 
 euro_init = {
     'elo':1455,
-    'glicko':1455,
+    'glicko':1397,
 }
 
 asg_set = {
@@ -32,7 +32,7 @@ ielo_set = {
 }
 
 glicko_set = {
-    'init':1500,
+    'init':1442,
     'phi':8.9, # 9 - 29.305, 8.75-29.306, < 8.75 is worse
     'sigma':0.002,
     'tau':0.2,

@@ -159,14 +159,20 @@ name_dict = {
     'III Charles Howell':'Charles Howell III',
     'III Harold Varner':'Harold Varner III',
     'PELT Bo Van':'Bo Van Pelt',
+    'JAGER Louis De':'Louis De Jager',
     'Miguel Ángel Jiménez':'Miguel Angel Jiménez',
     'K J Choi':'K.J. Choi',
     'Rory Mcilroy':'Rory McIlroy',
     'BELLO Rafa Cabrera':'Rafa Cabrera Bello',
     'Bryson Dechambeau':'Bryson DeChambeau',
-    'Erik Van Rooyen':'Erik van Rooyen',
-    'ROOYEN Erik Van':'Erik van Rooyen',
-    'Cheng Tsung Pan':'C.T. Pan'
+    'Erik van Rooyen':'Erik Van Rooyen',
+    'ROOYEN Erik Van':'Erik Van Rooyen',
+    'Cheng Tsung Pan':'C.T. Pan',
+    'Mike Lorenzo-vera':'Michael Lorenzo-vera',
+    'ZYL Jaco Van':'Jaco Van Zyl',
+    'Gonzalo Fdez-Castano':'Gonzalo Fernandez-Castano',
+    'Gonzalo Fdez-castaño':'Gonzalo Fernandez-Castano',
+    '"Ted Potter, Jr."':'Ted Potter, Jr.',
 }
 
 def name_pp(name):
@@ -174,6 +180,7 @@ def name_pp(name):
         name = name.replace("(AM) ","")
     if name in name_dict:
         name = name_dict[name]
+    name = name.replace('"','')
     return name
 
 def validate_tournament(row):
@@ -268,15 +275,41 @@ def get_gsg(glicko,days_since,rnds_played):
     # #adjust for rounds played
     gsg = apply_grp(gsg,rnds_played)
     return gsg
-#convert to sg
-# glicko_init_sg = apply_gpoly(p.glicko)
-# #adjust for days off
-# glicko_sg = apply_gdo(glicko_init_sg,p.days_since)
-# #adjust for rounds played
-# glicko_sg = apply_grp(glicko_init_sg,p.rnds_played)
-# gdiff = glicko_sg - glicko_init_sg
-# convert back to glicko
-# p.glicko += (gdiff * 6.514)
+
+def apply_epoly(x):
+    return -0.001049 * x**2 + 0.4673 * x - 46.92
+def apply_edo(x,ds):
+    return x + (0.25603 * np.exp(-0.21482 * (ds/7)) - 0.184)
+def apply_erp(x,rp):
+    if rp >= 10:
+        return x + (0.3583 * np.exp(-0.02573 * (rp/10)) -0.17)
+    elif rp >= 1:
+        return x
+    else:
+        return x - 0.33
+def get_esg(elo,days_since,rnds_played):
+    elo = elo/10
+    # #convert to sg
+    esg = apply_epoly(elo)
+    # #adjust for days off
+    esg = apply_edo(esg,days_since)
+    # #adjust for rounds played
+    esg = apply_erp(esg,rnds_played)
+    return esg
+# determine variance
+# PVar is based on Rounds Played
+def apply_pvrp1(rp):
+    return 2.000 * np.exp(-0.05430 * (rp/10)) + 7.76
+# PVar is also based on Skill Level
+def apply_pvrp2(esg):
+    return .87129 * np.exp(-0.48229 * esg) + 7.3
+
+def get_var(rp,esg):
+    x1 = apply_pvrp1(rp)
+    x2 = apply_pvrp2(esg)
+    x = .3*x1 + .7*x2
+    return 1.611664 * x -4.73032
+
 
 
 # end

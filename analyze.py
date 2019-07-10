@@ -48,33 +48,22 @@ print("dropping weird days since")
 all_sea = all_sea.loc[all_sea['DS']>=7]
 print(len(all_sea))
 
-# print("dropping players that play once or twice")
-# all_sea = all_sea.loc[all_sea['RndsPlayed']>=30]
-# print(len(all_sea))
+print("dropping players that play once or twice")
+all_sea = all_sea.loc[all_sea['RndsPlayed']>=30]
+print(len(all_sea))
 
-# def apply_epoly(x):
-#     return -0.001049 * x**2 + 0.4673 * x - 46.92
+
 #
 # def apply_gpoly(x):
 #     return 5.305e-05 * math.pow(x,3) - 0.02604 * x**2 + 4.391*x - 251.2
 #
 # # convert glicko and elo to predicted SG
-# all_sea['Elo10'] = all_sea['Elo']/10
-# all_sea['EloSG'] = all_sea.Elo10.apply(lambda x: apply_epoly(x))
-# all_sea = all_sea.drop(columns=['Elo10'])
-# #
-# def apply_edo(x,ds):
-#     return x + (0.25603 * np.exp(-0.21482 * (ds/7)) - 0.184)
-# all_sea['EloSG'] = all_sea.apply(lambda row: apply_edo(row['EloSG'],row['DS']), axis=1)
+all_sea['Elo10'] = all_sea['Elo']/10
+all_sea['EloSG'] = all_sea.Elo10.apply(lambda x: apply_epoly(x))
+all_sea = all_sea.drop(columns=['Elo10'])
 #
-# def apply_erp(x,rp):
-#     if rp >= 10:
-#         return x + (0.3583 * np.exp(-0.02573 * (rp/10)) -0.17)
-#     elif rp >= 1:
-#         return x
-#     else:
-#         return x - 0.33
-# all_sea['EloSG'] = all_sea.apply(lambda row: apply_erp(row['EloSG'],row['RndsPlayed']), axis=1)
+#
+all_sea['EloSG'] = all_sea.apply(lambda row: apply_erp(row['EloSG'],row['RndsPlayed']), axis=1)
 # #
 # all_sea['Glicko10'] = all_sea['Glicko']/10
 # all_sea['GlickoSG'] = all_sea.Glicko10.apply(lambda x: apply_gpoly(x))
@@ -116,31 +105,52 @@ print(len(all_sea))
 # #
 # all_sea['Diff'] = all_sea['SG'] - all_sea['ASG']
 
+
+all_sea['PVar1'] = all_sea.apply(lambda row: apply_pvrp1(row['RndsPlayed']), axis=1)
+all_sea['PVar2'] = all_sea.apply(lambda row: apply_pvrp2(row['EloSG']), axis=1)
+# all_sea['PVar1_Est'] = .443854*all_sea['PVar1'] + 4.4469
+# all_sea['PVar2_Est'] = .87663*all_sea['PVar2'] + 1.18476
+all_sea['PVar_Est'] = .3*all_sea['PVar1']+.7*all_sea['PVar2']
+all_sea['PVar_Est'] = 1.611664* all_sea['PVar_Est'] + -4.73032
+x = all_sea.PVar_Est.values
+y = all_sea.PVar.values
+print("PVar Est Vs PVar")
+slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
+print("slope: ", slope)
+print("y int", intercept)
+print("r value", r_value)
+print("p value", p_value)
+print("std error", std_err)
+plt.scatter(x,y)
+plt.show()
+raise ValueError
+
 ###################
 
 # tens of rounds played
-all_sea['TRP'] = all_sea['RndsPlayed']/10
-all_sea['TRP'] = all_sea['TRP'].astype(float)
-all_sea['TRP'] = all_sea['TRP'].round(0)
-all_sea['TRP'] = all_sea['TRP'].astype(int)
+# all_sea['TRP'] = all_sea['RndsPlayed']/10
+# all_sea['TRP'] = all_sea['TRP'].astype(float)
+# all_sea['TRP'] = all_sea['TRP'].round(0)
+# all_sea['TRP'] = all_sea['TRP'].astype(int)
 
 # find min threshold (35 rounds in 100 player fields)
-min_t = 100*20
+# min_t = 100*20
+#
+# gb = all_sea.groupby(['TRP']).count()
+# gb = gb.reset_index()
+# gb = gb.loc[gb['PVar']>=min_t]
+# allowed_rps = gb.TRP.unique()
+# print('ALLOWED RP',allowed_rps)
+#
+# gb = all_sea.groupby(['TRP']).mean()
+# gb = gb.reset_index()
+# gb = gb.loc[gb['TRP'].isin(allowed_rps)]
+# gb = gb.loc[gb['TRP']>=2]
+# x = gb.TRP.values
+# y = gb.PVar.values
 
-gb = all_sea.groupby(['TRP']).count()
-gb = gb.reset_index()
-gb = gb.loc[gb['Diff']>=min_t]
-allowed_rps = gb.TRP.unique()
-print('ALLOWED RP',allowed_rps)
-
-gb = all_sea.groupby(['TRP']).mean()
-gb = gb.reset_index()
-gb = gb.loc[gb['TRP'].isin(allowed_rps)]
-gb = gb.loc[gb['TRP']>=0]
-x = gb.TRP.values
-y = gb.PVar.values
-
-# C0=-0.186
+# A 2.0003965922329128 K -0.0543067578509118
+# C0=7.76
 # A, K = fit_exp_linear(x, y, C0)
 # print("A",A,"K",K)
 # fit_y = model_func(x, A, K, C0)
@@ -154,17 +164,17 @@ y = gb.PVar.values
 #   return a * np.log(b * x) + c
 # popt, pcov = curve_fit(func, x, y)
 
-fig, ax = plt.subplots(figsize=(15,7))
-plt.title('Effect of RP')
-plt.xlabel("RP")
-plt.ylabel("Actual vs. Expected SG")
-plt.plot(x,y)
+# fig, ax = plt.subplots(figsize=(15,7))
+# plt.title('Effect of RP')
+# plt.xlabel("RP")
+# plt.ylabel("Actual vs. Expected SG")
+# plt.plot(x,y)
 # plt.plot(x, poly2(x), 'r-', label="Fitted Curve")
-plt.plot(x, fit_y, 'r-', label="Fitted Curve")
-plt.show()
+# plt.plot(x, fit_y, 'r-', label="Fitted Curve")
+# plt.show()
 #
 # print(poly2)
-raise ValueError
+# raise ValueError
 
 ######### Glicko Weeks Since Last ####################
 # all_sea['WS'] = all_sea['DS']/7
@@ -175,10 +185,10 @@ raise ValueError
 #
 # # find min threshold (35 rounds in 100 player fields)
 # min_t = 100*10
-# #
+# # #
 # gb = all_sea.groupby(['WS']).count()
 # gb = gb.reset_index()
-# gb = gb.loc[gb['Diff']>=min_t]
+# gb = gb.loc[gb['PVar']>=min_t]
 # allowed_wks = gb.WS.unique()
 # print('ALLOWED WEEKS',allowed_wks)
 #
@@ -186,7 +196,7 @@ raise ValueError
 # gb = gb.reset_index()
 # gb = gb.loc[gb['WS']<=12]
 # x = gb.WS.values
-# y = gb.Diff.values
+# y = gb.PVar.values
 
 # C0=-0.125
 # A, K = fit_exp_linear(x, y, C0)
@@ -198,7 +208,7 @@ raise ValueError
 # plt.xlabel("Weeks Since Last Tournament")
 # plt.ylabel("Actual vs. Expected SG")
 # plt.plot(x,y)
-# plt.plot(x,fit_y)
+# # plt.plot(x,fit_y)
 # plt.show()
 #
 # raise ValueError
@@ -206,15 +216,15 @@ raise ValueError
 ######### Adj Elo and Glicko ######
 
 # create buckets of elo ratings
-all_sea['EloB'] = all_sea['Elo']/10
+all_sea['EloB'] = all_sea['EloSG']
 all_sea['EloB'] = all_sea['EloB'].astype(float)
 all_sea['EloB'] = all_sea['EloB'].round(0)
 all_sea['EloB'] = all_sea['EloB'].astype(int)
 
 gb = all_sea.groupby(['EloB']).count()
-print(gb)
+# print(gb)
 gb = gb.reset_index()
-gb = gb.loc[gb['Elo']>=75]
+gb = gb.loc[gb['EloSG']>=75]
 allowed_rps = gb.EloB.unique()
 print('ALLOWED RP',allowed_rps)
 #
@@ -223,7 +233,13 @@ gb = gb.reset_index()
 gb = gb.loc[gb['EloB'].isin(allowed_rps)]
 print(gb)
 x = gb.EloB.values
-y = gb.SG.values
+y = gb.PVar.values
+
+# A 0.8712928756334816 K -0.48229373117096863
+# C0=7.3
+A, K = fit_exp_linear(x, y, C0)
+print("A",A,"K",K)
+fit_y = model_func(x, A, K, C0)
 
 # x = all_sea.Elo.values
 # y = all_sea.SG.values
@@ -236,18 +252,8 @@ y = gb.SG.values
 # all_sea = all_sea.drop(columns=['Elo10'])
 # poly_pred = all_sea.EloSG.values
 
-# print("Elo Vs SG")
-# slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
-# print("slope: ", slope)
-# print("y int", intercept)
-# print("r value", r_value)
-# print("p value", p_value)
-# print("std error", std_err)
-# line_y = []
-# for _x in x:
-#     line_y.append(slope * _x + intercept)
 
-poly2 = np.poly1d(np.polyfit(x,y,2))
+# poly2 = np.poly1d(np.polyfit(x,y,2))
 # poly3 = np.poly1d(np.polyfit(x,y,3))
 # poly4 = np.poly1d(np.polyfit(x,y,4))
 
@@ -255,13 +261,13 @@ poly2 = np.poly1d(np.polyfit(x,y,2))
 
 # plt.title('Effect of Layoff Time')
 plt.xlabel("Elo Buckets")
-plt.ylabel("SG")
-plt.scatter(x,y)
+plt.ylabel("PVar")
+plt.plot(x,y)
 # plt.plot(x, line_y, '-r')
-plt.plot(x, poly2(x),'-k')
+plt.plot(x, fit_y,'-k')
 plt.show()
 
-print(poly2)
+# print(poly2)
 raise ValueError
 
 ######################################

@@ -18,6 +18,9 @@ pct_lgs = asg_set['pct_lgs']
 class Player(object):
     """docstring for Player."""
 
+    esg=0
+    gsg=0
+
     def __init__(self,
         name=None,
         tour='PGA',
@@ -61,7 +64,8 @@ class Player(object):
         self.R2 = R2
         self.R3 = R3
         self.R4 = R4
-        self.prev_sgs = prev_sgs
+        self.prev_sgs = self.fix_psgs(prev_sgs)
+        # self.prev_sgs = prev_sgs
         self.days_since = self.days_since_last()
         self.calc_var()
         self.wins=wins
@@ -70,6 +74,12 @@ class Player(object):
         self.matches=matches
         self.wl = wl
 
+    def fix_psgs(self,psgs):
+        psgs = str(psgs)
+        psgs = psgs.replace('[','')
+        psgs = psgs.replace(']','')
+        l = psgs.split()
+        return [float(x) for x in l]
     def add_win(self):
         self.wins+=1
         self.matches+=1
@@ -88,17 +98,9 @@ class Player(object):
         return
 
     def calc_var(self):
-        try:
-            self.prev_sgs = [float(i) for i in self.prev_sgs]
-        except:
-            self.prev_sgs = ast.literal_eval(self.prev_sgs)
-        if len(self.prev_sgs) <=0:
-            self.pvar = pvar_sms
-        # elif self.rnds_played <= 100:
-        #     self.pvar = pvar_sms
-        else:
-            # self.pvar = (pct_lgs * pvar_lgs) + (1-pct_lgs)* np.var(self.prev_sgs)
-            self.pvar = np.var(self.prev_sgs)
+        self.pvar = get_var(self.rnds_played,self.esg)
+        if self.rnds_played > 100:
+            self.pvar = 0.75 * self.pvar + 0.25*np.var(self.prev_sgs)
         return
 
     def calc_new_asg(self):

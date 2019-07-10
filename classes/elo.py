@@ -39,7 +39,7 @@ class Elo(object):
         acp = self.get_acp(elo_diff)
         return movm * acp
 
-    def get_k(self, rp, ds, num_opps, round):
+    def get_k(self, rp, ds, num_opps):
         # dimish as function of number of rp
         K = self.K
 
@@ -84,11 +84,11 @@ class Elo(object):
 
         return K
 
-    def get_ielo_delta(self, prob, margin, p1, p2, num_opps, round):
+    def get_ielo_delta(self, prob, margin, p1, p2, num_opps):
         gamma = self.get_gamma(margin, (p1.elo-p2.elo))
 
-        p1_K = self.get_k(p1.rnds_played, p1.days_since, num_opps, round)
-        p2_K = self.get_k(p2.rnds_played, p2.days_since, num_opps, round)
+        p1_K = self.get_k(p1.rnds_played, p1.days_since, num_opps)
+        p2_K = self.get_k(p2.rnds_played, p2.days_since, num_opps)
 
         p1_delta = (p1_K * gamma) * (1 - prob)
         p2_delta = -((p2_K * gamma) * (1 - prob))

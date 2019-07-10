@@ -4,6 +4,7 @@ import sys
 from numpy.polynomial.polynomial import polyfit
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 import scipy
 import scipy.stats as stats
@@ -12,6 +13,7 @@ import math
 import gc
 from tqdm import tqdm
 import random
+
 
 # https://stackoverflow.com/questions/3938042/fitting-exponential-decay-with-no-initial-guessing
 
@@ -35,8 +37,8 @@ seasons = [2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016
 # finding adjustment based on time off
 
 all_sea = pd.DataFrame()
-for season in seasons:
-    print("loading " + str(season))
+print("loading data...")
+for season in tqdm(seasons):
     path = './data/seasons/'+str(season)+'.csv'
     sea_df = pd.read_csv(path)
     all_sea = pd.concat([all_sea,sea_df],sort=False)
@@ -47,51 +49,74 @@ all_sea = all_sea.loc[all_sea['DS']>=7]
 print(len(all_sea))
 
 # print("dropping players that play once or twice")
-# all_sea = all_sea.loc[all_sea['RndsPlayed']>=10]
+# all_sea = all_sea.loc[all_sea['RndsPlayed']>=30]
 # print(len(all_sea))
 
-def apply_epoly(x):
-    return -0.001012 * x**2 + 0.4611 * x - 46.4
-
-def apply_gpoly(x):
-    return 5.305e-05 * math.pow(x,3) - 0.02604 * x**2 + 4.391*x - 251.2
-
-# convert glicko and elo to predicted SG
-all_sea['Elo10'] = all_sea['Elo']/10
-all_sea['EloSG'] = all_sea.Elo10.apply(lambda x: apply_epoly(x))
-all_sea = all_sea.drop(columns=['Elo10'])
+# def apply_epoly(x):
+#     return -0.001049 * x**2 + 0.4673 * x - 46.92
 #
-all_sea['Glicko10'] = all_sea['Glicko']/10
-all_sea['GlickoSG'] = all_sea.Glicko10.apply(lambda x: apply_gpoly(x))
-
-def apply_gdo(x,ds):
-    return x + (0.34837 * np.exp(-0.20651 * (ds/7)) - 0.25)
-
-all_sea['GlickoSG'] = all_sea.apply(lambda row: apply_gdo(row['GlickoSG'],row['DS']), axis=1)
-all_sea = all_sea.drop(columns=['Glicko10'])
-
-# x = all_sea.Glicko.values
-# y = all_sea.SG.values
-# print("Glicko Vs SG")
-# slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
-# print("slope: ", slope)
-# print("y int", intercept)
-# print("r value", r_value)
-# print("p value", p_value)
-# print("std error", std_err)
-# raise ValueError
-
+# def apply_gpoly(x):
+#     return 5.305e-05 * math.pow(x,3) - 0.02604 * x**2 + 4.391*x - 251.2
+#
+# # convert glicko and elo to predicted SG
+# all_sea['Elo10'] = all_sea['Elo']/10
+# all_sea['EloSG'] = all_sea.Elo10.apply(lambda x: apply_epoly(x))
+# all_sea = all_sea.drop(columns=['Elo10'])
+# #
+# def apply_edo(x,ds):
+#     return x + (0.25603 * np.exp(-0.21482 * (ds/7)) - 0.184)
+# all_sea['EloSG'] = all_sea.apply(lambda row: apply_edo(row['EloSG'],row['DS']), axis=1)
+#
+# def apply_erp(x,rp):
+#     if rp >= 10:
+#         return x + (0.3583 * np.exp(-0.02573 * (rp/10)) -0.17)
+#     elif rp >= 1:
+#         return x
+#     else:
+#         return x - 0.33
+# all_sea['EloSG'] = all_sea.apply(lambda row: apply_erp(row['EloSG'],row['RndsPlayed']), axis=1)
+# #
+# all_sea['Glicko10'] = all_sea['Glicko']/10
+# all_sea['GlickoSG'] = all_sea.Glicko10.apply(lambda x: apply_gpoly(x))
+# #
+# def apply_gdo(x,ds):
+#     return x + (0.34837 * np.exp(-0.20651 * (ds/7)) - 0.25)
+# all_sea['GlickoSG'] = all_sea.apply(lambda row: apply_gdo(row['GlickoSG'],row['DS']), axis=1)
+# #
+# def apply_grp(x,rp):
+#     if rp >= 10:
+#         return x + (0.5398 * np.exp(-0.03349 * (rp/10)) -0.42)
+#     else:
+#         return -0.0007911 *math.pow(x,4) + 0.02037 *math.pow(x,3) - 0.1835 * x**2 + 0.6805 *x - 0.9421
+#
+# all_sea['GlickoSG'] = all_sea.apply(lambda row: apply_grp(row['GlickoSG'],row['RndsPlayed']), axis=1)
+# all_sea = all_sea.drop(columns=['Glicko10'])
+#
+# def apply_sdo(x,ds):
+#     return x + (0.20129 * np.exp(-0.223173 * (ds/7)) - 0.12)
+# all_sea['ASG'] = all_sea.apply(lambda row: apply_sdo(row['ASG'],row['DS']), axis=1)
+#
+# def apply_srp(x,rp):
+#     if rp > 0:
+#         return x + (0.328458 * np.exp(-0.020336 * (rp/10)) - 0.186)
+# all_sea['ASG'] = all_sea.apply(lambda row: apply_srp(row['ASG'],row['RndsPlayed']), axis=1)
+#
 # acc_check = all_sea[['Elo','SG','EloSG','GlickoSG','ASG']]
 # print(all_sea.SG.mean())
 # print(all_sea.EloSG.mean())
 # print(all_sea.GlickoSG.mean())
+# print("Median")
+# print(all_sea.SG.median())
+# print(all_sea.GlickoSG.median())
 # from sklearn.metrics import mean_squared_error
 # print("ASG Error",mean_squared_error(acc_check.SG.values, acc_check.ASG.values))
 # print("Elo Error",mean_squared_error(acc_check.SG.values, acc_check.EloSG.values))
 # print("Glicko Error",mean_squared_error(acc_check.SG.values, acc_check.GlickoSG.values))
 # raise ValueError
+# #
+# all_sea['Diff'] = all_sea['SG'] - all_sea['ASG']
 
-all_sea['GDiff'] = all_sea['SG'] - all_sea['GlickoSG']
+###################
 
 # tens of rounds played
 all_sea['TRP'] = all_sea['RndsPlayed']/10
@@ -100,36 +125,48 @@ all_sea['TRP'] = all_sea['TRP'].round(0)
 all_sea['TRP'] = all_sea['TRP'].astype(int)
 
 # find min threshold (35 rounds in 100 player fields)
-min_t = 100*25
+min_t = 100*20
 
 gb = all_sea.groupby(['TRP']).count()
 gb = gb.reset_index()
-gb = gb.loc[gb['GDiff']>=min_t]
+gb = gb.loc[gb['Diff']>=min_t]
 allowed_rps = gb.TRP.unique()
-# print('ALLOWED RP',allowed_rps)
+print('ALLOWED RP',allowed_rps)
 
 gb = all_sea.groupby(['TRP']).mean()
 gb = gb.reset_index()
 gb = gb.loc[gb['TRP'].isin(allowed_rps)]
+gb = gb.loc[gb['TRP']>=0]
 x = gb.TRP.values
-y = gb.GDiff.values
+y = gb.PVar.values
 
-# C0=-0.25
+# C0=-0.186
 # A, K = fit_exp_linear(x, y, C0)
 # print("A",A,"K",K)
 # fit_y = model_func(x, A, K, C0)
+
+# poly2 = np.poly1d(np.polyfit(x,y,2))
+
+# from scipy.optimize import curve_fit
+#
+# def func(x, a, b, c):
+#   #return a * np.exp(-b * x) + c
+#   return a * np.log(b * x) + c
+# popt, pcov = curve_fit(func, x, y)
 
 fig, ax = plt.subplots(figsize=(15,7))
 plt.title('Effect of RP')
 plt.xlabel("RP")
 plt.ylabel("Actual vs. Expected SG")
 plt.plot(x,y)
-# plt.plot(x,fit_y)
+# plt.plot(x, poly2(x), 'r-', label="Fitted Curve")
+plt.plot(x, fit_y, 'r-', label="Fitted Curve")
 plt.show()
+#
+# print(poly2)
+raise ValueError
 
 ######### Glicko Weeks Since Last ####################
-# all_sea['GDiff'] = all_sea['SG'] - all_sea['GlickoSG']
-# #
 # all_sea['WS'] = all_sea['DS']/7
 # all_sea['WS'] = all_sea['WS'].astype(float)
 # all_sea['WS'] = all_sea['WS'].round(0)
@@ -141,29 +178,30 @@ plt.show()
 # #
 # gb = all_sea.groupby(['WS']).count()
 # gb = gb.reset_index()
-# gb = gb.loc[gb['GDiff']>=min_t]
+# gb = gb.loc[gb['Diff']>=min_t]
 # allowed_wks = gb.WS.unique()
-# # print('ALLOWED WEEKS',allowed_wks)
-# #
+# print('ALLOWED WEEKS',allowed_wks)
+#
 # gb = all_sea.groupby(['WS']).mean()
 # gb = gb.reset_index()
 # gb = gb.loc[gb['WS']<=12]
 # x = gb.WS.values
-# y = gb.GDiff.values
+# y = gb.Diff.values
 
-# C0=-0.25
+# C0=-0.125
 # A, K = fit_exp_linear(x, y, C0)
 # print("A",A,"K",K)
-# fit_y = model_func(x, A, K, C0)
+# fit_y = model_func(x, A, K, (C0+0.005))
 
 # fig, ax = plt.subplots(figsize=(15,7))
 # plt.title('Effect of Layoff Time')
 # plt.xlabel("Weeks Since Last Tournament")
 # plt.ylabel("Actual vs. Expected SG")
 # plt.plot(x,y)
-# # plt.plot(x,fit_y)
+# plt.plot(x,fit_y)
 # plt.show()
-raise ValueError
+#
+# raise ValueError
 
 ######### Adj Elo and Glicko ######
 
@@ -229,56 +267,56 @@ raise ValueError
 ######################################
 
 # create buckets of glicko ratings
-all_sea['GlickoB'] = all_sea['Glicko']/10
-all_sea['GlickoB'] = all_sea['GlickoB'].astype(float)
-all_sea['GlickoB'] = all_sea['GlickoB'].round(0)
-all_sea['GlickoB'] = all_sea['GlickoB'].astype(int)
+all_sea['EloB'] = all_sea['Elo']/10
+all_sea['EloB'] = all_sea['EloB'].astype(float)
+all_sea['EloB'] = all_sea['EloB'].round(0)
+all_sea['EloB'] = all_sea['EloB'].astype(int)
 #
-gb = all_sea.groupby(['GlickoB']).count()
+gb = all_sea.groupby(['EloB']).count()
 print(gb)
 gb = gb.reset_index()
-gb = gb.loc[gb['Glicko']>=75]
-allowed_rps = gb.GlickoB.unique()
+gb = gb.loc[gb['Elo']>=10]
+allowed_rps = gb.EloB.unique()
 print('ALLOWED RP',allowed_rps)
 # #
-gb = all_sea.groupby(['GlickoB']).mean()
+gb = all_sea.groupby(['EloB']).mean()
 gb = gb.reset_index()
-gb = gb.loc[gb['GlickoB'].isin(allowed_rps)]
+gb = gb.loc[gb['EloB'].isin(allowed_rps)]
 print(gb)
-x = gb.GlickoB.values
+x = gb.EloB.values
 y = gb.SG.values
 
 
-def apply_poly(x):
-    return -3.235e-06 * math.pow(x,4) + 0.002052 * math.pow(x,3) - 0.4879 * x**2 + 51.66*x - 2060
-#
-all_sea['Glicko10'] = all_sea['Glicko']/10
-all_sea['GlickoSG'] = all_sea.Glicko10.apply(lambda x: apply_poly(x))
-all_sea = all_sea.drop(columns=['Glicko10'])
+# def apply_poly(x):
+#     return -3.235e-06 * math.pow(x,4) + 0.002052 * math.pow(x,3) - 0.4879 * x**2 + 51.66*x - 2060
+# #
+# all_sea['Glicko10'] = all_sea['Glicko']/10
+# all_sea['GlickoSG'] = all_sea.Glicko10.apply(lambda x: apply_poly(x))
+# all_sea = all_sea.drop(columns=['Glicko10'])
 
-print("Glicko Vs SG")
-slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
-print("slope: ", slope)
-print("y int", intercept)
-print("r value", r_value)
-print("p value", p_value)
-print("std error", std_err)
-line_y = []
-for _x in x:
-    line_y.append(slope * _x + intercept)
+# print("Glicko Vs SG")
+# slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
+# print("slope: ", slope)
+# print("y int", intercept)
+# print("r value", r_value)
+# print("p value", p_value)
+# print("std error", std_err)
+# line_y = []
+# for _x in x:
+#     line_y.append(slope * _x + intercept)
 
-poly = np.poly1d(np.polyfit(x,y,2))
+# poly = np.poly1d(np.polyfit(x,y,2))
 poly3 = np.poly1d(np.polyfit(x,y,3))
-poly4 = np.poly1d(np.polyfit(x,y,4))
+# poly4 = np.poly1d(np.polyfit(x,y,4))
 
 # fig, ax = plt.subplots(figsize=(15,7))
 plt.title('Effect of Layoff Time')
-plt.xlabel("Glicko Buckets")
+plt.xlabel("Elo Buckets")
 plt.ylabel("SG")
 plt.scatter(x,y)
-plt.plot(x, line_y, '-r')
-plt.plot(x, poly3(x),'-y')
-plt.plot(x, poly4(x),'-k')
+# plt.plot(x, line_y, '-r')
+plt.plot(x, poly3(x),'-rs')
+# plt.plot(x, poly4(x),'-k')
 plt.show()
 
 print(poly3)

@@ -74,8 +74,8 @@ sdf = sdf.reset_index()
 seasons = list(sdf.season.unique())
 seasons.sort()
 
-all_sg0_loss = []
-all_sg1_loss = []
+all_sg_loss = []
+all_gsg_loss = []
 all_l5_loss = []
 # all_relo_loss = []
 all_elo_loss = []
@@ -94,8 +94,8 @@ for season in seasons:
     sea_df = sdf.loc[sdf.season==season]
     sea_df = sea_df.sort_values(by='end_date', ascending=True)
 
-    sea_sg0_loss = []
-    sea_sg1_loss = []
+    sea_sg_loss = []
+    sea_gsg_loss = []
     sea_l5_loss = []
     # sea_relo_loss = []
     sea_elo_loss = []
@@ -129,8 +129,8 @@ for season in seasons:
         plist = []
 
         # error tracking
-        tsg0_err = []
-        tsg1_err = []
+        tsg_err = []
+        tgsg_err = []
         tl5_err = []
         # trelo_err =[]
         telo_err = []
@@ -209,6 +209,8 @@ for season in seasons:
 
             # track field strength of the round
             field_sg = []
+            field_esg = []
+            field_gsg = []
             # track all scores to determine SG
             rnd_scores = []
             # throw out any player that doesn't have a round score
@@ -220,16 +222,23 @@ for season in seasons:
                 round_score = getattr(p, round)
                 include = validate(round_score)
                 if include:
+                    # i calibrated based off rounds played one higher than it should have been
                     p.rnds_played += 1
-                    # adjust for rounds played (only after decent amount of rankings run)
-                    if int(season) >= 2003:
-                    # players improve at the beginning of their career every round
-                        if len(p.prev_sgs) > 0:
-                            p.asg += (0.323616 * np.exp(-0.03179 * (p.rnds_played/10)) -0.08)/2
-                        # adjust for layoff
-                        if (p.days_since >= 5):
-                            p.asg += (0.21033 * np.exp(-0.24615 * (p.days_since/7)) -0.1)
+
+                    if p.rnds_played > 0:
+                        p.gsg = get_gsg(p.glicko,p.days_since,p.rnds_played)
+                    else:
+                        p.gsg = 0
+
+                    # make adjustments
+                    # if int(season) >= 2003:
+                    #     if len(p.prev_sgs) > 0:
+                    #         p.asg += (0.323616 * np.exp(-0.03179 * (p.rnds_played/10)) -0.08)/2
+                    #     # adjust for layoff
+                    #     if (p.days_since >= 5):
+                    #         p.asg += (0.21033 * np.exp(-0.24615 * (p.days_since/7)) -0.1)
                     field_sg.append(p.asg)
+                    field_gsg.append(p.gsg)
                     rnd_scores.append(round_score)
                     good_plist.append(p)
                 else:
@@ -242,6 +251,7 @@ for season in seasons:
             if CALC_SG:
                 # determine the field strength via average adjusted strokes gained
                 field_str = sum(field_sg)/len(field_sg)
+                gfield_str = sum(field_gsg)/len(field_gsg)
                 # determine avg score for SG
                 avg_score = sum(rnd_scores)/len(rnd_scores)
 
@@ -265,13 +275,15 @@ for season in seasons:
                 rnd_score = getattr(p, round)
                 if CALC_SG:
                     SG = -1 * (rnd_score - avg_score) + field_str
+                    _SG = -1 * (rnd_score - avg_score) + gfield_str
                     p.prev_sgs = np.append(p.prev_sgs,np.float(SG))
                     ASG = p.asg
+                    GSG = p.gsg
                     sg_err = rmse(ASG,SG)
-                    if p.rnds_played >= 100:
-                        tsg1_err.append(sg_err)
-                    else:
-                        tsg0_err.append(sg_err)
+                    gsg_err = rmse(GSG,_SG)
+
+                    tsg_err.append(sg_err)
+                    tgsg_err.append(gsg_err)
 
                     if int(season) >= 2003:
                         sea_data.append([p.elo,p.glicko,p.gvar,p.asg,p.pvar,SG,sg_err,round,p.rnds_played,p.days_since])
@@ -400,12 +412,12 @@ for season in seasons:
             'wins':p.wins,'losses':p.losses,'ties':p.ties,'wl':p.wl,'matches':p.matches}
             pdf[p.name] = stats
         # calculate error
-        if len(tsg0_err)>0:
-            tournament_sg0_loss = np.round(sum(tsg0_err)/len(tsg0_err),5)
-            sea_sg0_loss.append(tournament_sg0_loss)
-        if len(tsg1_err)>0:
-            tournament_sg1_loss = np.round(sum(tsg1_err)/len(tsg1_err),5)
-            sea_sg1_loss.append(tournament_sg1_loss)
+        if len(tsg_err)>0:
+            tournament_sg_loss = np.round(sum(tsg_err)/len(tsg_err),5)
+            sea_sg_loss.append(tournament_sg_loss)
+        if len(tgsg_err)>0:
+            tournament_gsg_loss = np.round(sum(tgsg_err)/len(tgsg_err),5)
+            sea_gsg_loss.append(tournament_gsg_loss)
         if CALC_LOG5:
             tournament_l5_loss = np.round(sum(tl5_err)/len(tl5_err),5)
             sea_l5_loss.append(tournament_l5_loss)
@@ -437,19 +449,17 @@ for season in seasons:
         all_l5_loss.append(sea_l5_loss)
         sea_row.append(sea_l5_loss)
     if CALC_SG:
-        sea_sg0_loss = np.round(sum(sea_sg0_loss)/len(sea_sg0_loss),5)
-        sea_sg1_loss = np.round(sum(sea_sg1_loss)/len(sea_sg1_loss),5)
-        print("Season SG0 Loss: ",sea_sg0_loss)
-        print("Season SG1 Loss: ",sea_sg1_loss)
-        sea_row.append(sea_sg0_loss)
-        sea_row.append(sea_sg1_loss)
+        sea_sg_loss = np.round(sum(sea_sg_loss)/len(sea_sg_loss),5)
+        sea_gsg_loss = np.round(sum(sea_gsg_loss)/len(sea_gsg_loss),5)
+        print("Season SG Loss: ",sea_sg_loss)
+        print("Season GSG Loss: ",sea_gsg_loss)
+        sea_row.append(sea_sg_loss)
+        sea_row.append(sea_gsg_loss)
     if len(sea_row) > 1:
         all_sea_data.append(sea_row)
     print(season)
-    # print(sea_sg0_loss)
-    # print(sea_sg1_loss)
-    all_sg0_loss.append(sea_sg0_loss)
-    all_sg1_loss.append(sea_sg1_loss)
+    all_sg_loss.append(sea_sg_loss)
+    all_gsg_loss.append(sea_gsg_loss)
 
     print("Saving data for train...")
     sea_data_df = pd.DataFrame(sea_data,columns=['Elo','Glicko','GVar','ASG','PVar','SG','SG_Err','Round','RndsPlayed','DS'])
@@ -471,14 +481,14 @@ print(player_ratings.head(50))
 
 player_ratings.to_csv('./data/current_player_ratings.csv',index=False)
 #
-print('TOTAL AVERAGE ASG0 LOSS', str(np.round(sum(all_sg0_loss)/len(all_sg0_loss),5)))
-print('TOTAL AVERAGE ASG1 LOSS', str(np.round(sum(all_sg1_loss)/len(all_sg1_loss),5)))
+print('TOTAL AVERAGE ASG LOSS', str(np.round(sum(all_sg_loss)/len(all_sg_loss),5)))
+print('TOTAL AVERAGE GSG LOSS', str(np.round(sum(all_gsg_loss)/len(all_gsg_loss),5)))
 # print('TOTAL AVERAGE L5 LOSS', str(np.round(sum(all_l5_loss)/len(all_l5_loss),5)))
 print('TOTAL AVERAGE ELO LOSS', str(np.round(sum(all_elo_loss)/len(all_elo_loss),5)))
 # print('TOTAL AVERAGE rELO LOSS', str(np.round(sum(all_relo_loss)/len(all_relo_loss),5)))
 print('TOTAL AVERAGE GLICKO LOSS', str(np.round(sum(all_glicko_loss)/len(all_glicko_loss),5)))
 
-all_sea_data = pd.DataFrame(all_sea_data,columns=['Season','Elo','Glicko','SG0','SG1'])
+all_sea_data = pd.DataFrame(all_sea_data,columns=['Season','Elo','Glicko','SG'])
 all_sea_data.to_csv('./data/yby_data.csv',index=False)
 print(all_sea_data)
 

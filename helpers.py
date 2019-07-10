@@ -247,11 +247,36 @@ def validate(score):
     return isValid
 
 
+def apply_gpoly(x):
+    return 5.305e-05 * math.pow(x,3) - 0.02604 * x**2 + 4.391*x - 251.2
 
+def apply_gdo(x,ds):
+    return x + (0.34837 * np.exp(-0.20651 * (ds/7)) - 0.25)
 
+def apply_grp(x,rp):
+    if rp >= 10:
+        return x + (0.5398 * np.exp(-0.03349 * (rp/10)) -0.42)
+    else:
+        return -0.0007911 *math.pow(x,4) + 0.02037 *math.pow(x,3) - 0.1835 * x**2 + 0.6805 *x - 0.9421
 
-
-
+def get_gsg(glicko,days_since,rnds_played):
+    glicko = glicko/10
+    # #convert to sg
+    gsg = apply_gpoly(glicko)
+    # #adjust for days off
+    gsg = apply_gdo(gsg,days_since)
+    # #adjust for rounds played
+    gsg = apply_grp(gsg,rnds_played)
+    return gsg
+#convert to sg
+# glicko_init_sg = apply_gpoly(p.glicko)
+# #adjust for days off
+# glicko_sg = apply_gdo(glicko_init_sg,p.days_since)
+# #adjust for rounds played
+# glicko_sg = apply_grp(glicko_init_sg,p.rnds_played)
+# gdiff = glicko_sg - glicko_init_sg
+# convert back to glicko
+# p.glicko += (gdiff * 6.514)
 
 
 # end
